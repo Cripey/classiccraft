@@ -290,19 +290,26 @@ public final class McwowCombat {
         McwowLoot.drop(level, McwowActors.drainKills());
         net.mcwow.bridge.McwowNodes.confirm(server, level, McwowActors.drainHarvests());
         for (McwowActorEntity proxy : PROXIES.values()) {
-            float[] hit = proxy.takeHit();
-            if (hit != null) {
+            java.util.List<float[]> hits = new java.util.ArrayList<>(proxy.takeDotHits());
+            float[] direct = proxy.takeHit();
+            if (direct != null) hits.add(0, direct);
+            for (float[] hit : hits) {
                 int flags = Float.floatToRawIntBits(hit[1]);
-                // Gear (2026-10-03): the hit lands at the weapon's item level, not the character's.
+                // Gear (2026-10-03): the hit lands at the weapon's item level, not the character's;
+                // ranged too since 2026-10-04 (the hit names its weapon). A weapon without a gear
+                // stamp: melee as item level 1, ranged at the character's level (McwowGear.attackLevel).
                 List<ServerPlayer> ps = server.getPlayerList().getPlayers();
-                int at = ps.isEmpty() ? snapshot.level() : net.mcwow.bridge.McwowGear.attackLevel(ps.getFirst(),
-                        snapshot.level(), (flags & McwowActorEntity.HIT_PROJECTILE) != 0);
+                int at = hit[2] > 0 ? (int) hit[2] : ps.isEmpty() ? snapshot.level() : net.mcwow.bridge.McwowGear.attackLevel(
+                        ps.getFirst(), snapshot.level(), (flags & McwowActorEntity.HIT_PROJECTILE) != 0);
                 int dmg = wowDamage(hit[0], at);
                 HITS.add(new WowHit(proxy.guid(), dmg, flags, 0));
-                LOGGER.info("mcwow-bridge: hit WoW creature entry={} lvl={} for {} Minecraft damage at item level {} -> {} WoW damage{}{}",
+                var school = net.mcwow.bridge.McwowSpells.School.byWow((flags >> McwowActorEntity.SCHOOL_SHIFT) & 0x7);
+                LOGGER.info("mcwow-bridge: hit WoW creature entry={} lvl={} for {} Minecraft damage at item level {} -> {} WoW damage{}{}{}{}",
                         proxy.entry(), proxy.wowLevel(), hit[0], at, dmg,
                         (flags & McwowActorEntity.HIT_CRITICAL) != 0 ? " CRIT" : "",
-                        (flags & McwowActorEntity.HIT_PROJECTILE) != 0 ? " projectile" : "");
+                        (flags & McwowActorEntity.HIT_PROJECTILE) != 0 ? " projectile" : "",
+                        school != null ? " " + school.title().toLowerCase() : "",
+                        (flags & McwowActorEntity.HIT_PERIODIC) != 0 ? " (over time)" : "");
             }
             for (Map.Entry<Integer, Float> mob : proxy.takeMobHits().entrySet()) {
                 int dmg = wowDamage(mob.getValue(), proxy.wowLevel());

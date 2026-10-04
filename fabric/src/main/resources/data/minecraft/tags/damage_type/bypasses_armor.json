@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "mcwow:spell_holy",
+    "mcwow:spell_fire",
+    "mcwow:spell_nature",
+    "mcwow:spell_frost",
+    "mcwow:spell_shadow",
+    "mcwow:spell_arcane"
+  ]
+}

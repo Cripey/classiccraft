@@ -917,6 +917,13 @@ reference until classiccraft catches up.
    Anvils in WoW dims cost only materials (user): `AnvilMenuMixin` (no level check/charge, no 40-level cut),
    `AnvilScreenMixin` (no cost label).
 
+27. **Ranged weapons** (2026-10-04, user; design in `docs/topics.md` row 38; OPEN: test live). Spell schools on our
+   hits: mod `McwowSpells` (school damage types `data/mcwow/damage_type/spell_*.json`, armor-bypassing), stand-in hit
+   flags 16 periodic / 32 slow / bits 8-10 school, damage over time per school (`McwowActorEntity.addDot`), Fire Aspect
+   as fire DoT; benilla passes them as `CC_HIT_PERIODIC` 4 / `CC_HIT_SLOW` 8 / school bits; VMaNGOS `HandleCCHitOpcode`:
+   school -> `CalculateDamageAbsorbAndResist`, immunity -> SPELL_MISS_IMMUNE, log as spell 5019 (Shoot), frost casts
+   7321 (Chilled). Hits carry their weapon's item level (`source.getWeaponItem()`), ranged included.
+
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
   From now on (user, 2026-10-04): commit each logical change as it's done, small commits in whichever repo it touches,

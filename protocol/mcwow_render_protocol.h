@@ -102,6 +102,7 @@ typedef struct McwowRenHit { // 24 bytes since classiccraft (attackerId added)
     uint64_t guid;      // the WoW creature
     uint32_t wowDamage; // already scaled to WoW (McwowCombat.wowDamage), >= 1
     uint32_t flags;     // McwowActorEntity.HIT_*: 1 projectile, 2 critical, 4 fire, 8 thrown (egg/snowball),
+                        // 16 damage-over-time tick, 32 frost slow, bits 8-10 spell school (0 physical .. 6 arcane),
                         // (16 "wild" is gone in classiccraft: a mob's hit names it in attackerId)
     uint32_t attackerId; // 0 the player, else the Minecraft mob's entity id (its server proxy hits)
     uint32_t pad;

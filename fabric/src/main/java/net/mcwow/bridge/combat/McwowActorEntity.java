@@ -6,6 +6,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
@@ -25,6 +26,8 @@ import org.jspecify.annotations.Nullable;
  */
 public class McwowActorEntity extends LivingEntity {
     public static final int HIT_PROJECTILE = 1, HIT_CRITICAL = 2, HIT_FIRE = 4, HIT_THROWN = 8;
+    /** 2026-10-04: a damage-over-time tick, frost's slow; bits 8-10 the spell school (McwowSpells, WoW's SpellSchools). */
+    public static final int HIT_PERIODIC = 16, HIT_SLOW = 32, SCHOOL_SHIFT = 8;
 
     private static final EntityDataAccessor<Float> WIDTH = SynchedEntityData.defineId(McwowActorEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> HEIGHT = SynchedEntityData.defineId(McwowActorEntity.class, EntityDataSerializers.FLOAT);
@@ -38,7 +41,27 @@ public class McwowActorEntity extends LivingEntity {
     // This tick's hit, flushed by McwowCombat after all attacks of the tick have landed.
     private float pendingDamage;
     private int pendingFlags;
+    /** The weapon's item level of this tick's hit (its gear stamp; 0: none - McwowCombat falls back). */
+    private int pendingIlvl;
     private boolean hitThisTick;
+    /** Damage over time from the player (fire, shadow, nature, Fire Aspect): ticks once a second. */
+    private final java.util.List<Dot> dots = new java.util.ArrayList<>();
+    /** Damage-over-time ticks due this tick: {damage, flags, item level}. */
+    private final java.util.List<float[]> dotHits = new java.util.ArrayList<>();
+
+    private static final class Dot {
+        final net.mcwow.bridge.McwowSpells.School school;
+        final float perSecond;
+        final int ilvl;
+        int seconds, tick;
+
+        Dot(net.mcwow.bridge.McwowSpells.School school, float perSecond, int seconds, int ilvl) {
+            this.school = school;
+            this.perSecond = perSecond;
+            this.seconds = seconds;
+            this.ilvl = ilvl;
+        }
+    }
     /**
      * This tick's hits by Minecraft mobs (zombies, the player's tamed wolves...), by entity id
      * (classiccraft): each becomes a hit from that mob's proxy on the server, so the WoW creature
@@ -119,6 +142,29 @@ public class McwowActorEntity extends LivingEntity {
         if (source.getDirectEntity() instanceof Projectile) this.pendingFlags |= HIT_PROJECTILE;
         if (thrown) this.pendingFlags |= HIT_THROWN; // egg / snowball: pulls aggro (user's choice)
         if (source.is(net.minecraft.tags.DamageTypeTags.IS_FIRE)) this.pendingFlags |= HIT_FIRE;
+        // The weapon behind the hit (2026-10-04): its item level sets the hit's, ranged too (a bow's
+        // arrow names its bow). Unstamped: 0, McwowCombat falls back (melee 1, ranged the character).
+        ItemStack weapon = source.getWeaponItem();
+        net.mcwow.bridge.McwowGear.Gear gear = weapon != null ? net.mcwow.bridge.McwowGear.of(weapon) : null;
+        if (gear != null && weapon.has(net.mcwow.bridge.McwowGear.GEAR) && net.mcwow.bridge.McwowGear.usable(weapon)) {
+            this.pendingIlvl = Math.max(this.pendingIlvl, gear.ilvl());
+        }
+        // A spell school (McwowSpells): WoW's resistances apply; fire, shadow and nature leave a
+        // damage over time, frost Chills.
+        net.mcwow.bridge.McwowSpells.School school = net.mcwow.bridge.McwowSpells.schoolOf(source);
+        if (school != null) {
+            this.pendingFlags = (this.pendingFlags & ~(0x7 << SCHOOL_SHIFT)) | (school.wow << SCHOOL_SHIFT);
+            if (school == net.mcwow.bridge.McwowSpells.School.FROST) this.pendingFlags |= HIT_SLOW;
+            if (school.dot) addDot(school, dmg * net.mcwow.bridge.McwowSpells.DOT_SHARE / net.mcwow.bridge.McwowSpells.DOT_SECONDS,
+                    net.mcwow.bridge.McwowSpells.DOT_SECONDS, this.pendingIlvl);
+        }
+        // Fire Aspect: vanilla's burn (1 a second, 4 s a level) as WoW fire damage over time.
+        if (weapon != null && !(source.getDirectEntity() instanceof Projectile)) {
+            int fa = net.minecraft.world.item.enchantment.EnchantmentHelper.getItemEnchantmentLevel(level.registryAccess()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT)
+                    .getOrThrow(net.minecraft.world.item.enchantment.Enchantments.FIRE_ASPECT), weapon);
+            if (fa > 0) addDot(net.mcwow.bridge.McwowSpells.School.FIRE, 1.0F, 4 * fa, this.pendingIlvl);
+        }
         this.hitThisTick = true;
         this.getCombatTracker().recordDamage(source, dmg);
     }
@@ -145,14 +191,34 @@ public class McwowActorEntity extends LivingEntity {
         this.pendingFlags |= HIT_CRITICAL;
     }
 
-    /** This tick's hit {damage, flags} and clears it; null if nothing hit us. */
+    /** This tick's hit {damage, flags, item level} and clears it; null if nothing hit us. */
     public float[] takeHit() {
         if (!this.hitThisTick) return null;
-        float[] hit = {this.pendingDamage, Float.intBitsToFloat(this.pendingFlags)};
+        float[] hit = {this.pendingDamage, Float.intBitsToFloat(this.pendingFlags), this.pendingIlvl};
         this.pendingDamage = 0.0F;
         this.pendingFlags = 0;
+        this.pendingIlvl = 0;
         this.hitThisTick = false;
         return hit;
+    }
+
+    /**
+     * Damage over time from the player: perSecond Minecraft damage each second for that many
+     * seconds, as WoW damage of the school (one of a school at a time: a new one replaces it).
+     */
+    public void addDot(net.mcwow.bridge.McwowSpells.School school, float perSecond, int seconds, int ilvl) {
+        if (perSecond <= 0 || seconds <= 0) return;
+        this.dots.removeIf(d -> d.school == school);
+        this.dots.add(new Dot(school, perSecond, seconds, ilvl));
+        if (school == net.mcwow.bridge.McwowSpells.School.FIRE) this.setRemainingFireTicks(Math.max(this.getRemainingFireTicks(), seconds * 20));
+    }
+
+    /** This tick's damage-over-time ticks {damage, flags, item level}, cleared. */
+    public java.util.List<float[]> takeDotHits() {
+        if (this.dotHits.isEmpty()) return java.util.List.of();
+        java.util.List<float[]> out = new java.util.ArrayList<>(this.dotHits);
+        this.dotHits.clear();
+        return out;
     }
 
     @Override
@@ -165,6 +231,20 @@ public class McwowActorEntity extends LivingEntity {
         // Position and rotation come from WoW (McwowCombat); keep hurt timers and fire ticking.
         this.baseTick();
         this.setHealth(this.getMaxHealth());
+        if (!this.level().isClientSide() && !this.dots.isEmpty()) {
+            for (java.util.Iterator<Dot> it = this.dots.iterator(); it.hasNext(); ) {
+                Dot d = it.next();
+                if (++d.tick % 20 != 0) continue;
+                this.dotHits.add(new float[] {d.perSecond,
+                        Float.intBitsToFloat(HIT_PERIODIC | (d.school.wow << SCHOOL_SHIFT)), d.ilvl});
+                if (this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+                    sl.sendParticles(d.school.particle, this.getX(), this.getY() + this.getBbHeight() * 0.6, this.getZ(),
+                            6, this.getBbWidth() * 0.3, this.getBbHeight() * 0.3, this.getBbWidth() * 0.3, 0.01);
+                }
+                if (--d.seconds <= 0) it.remove();
+            }
+            if (!this.attackable || this.isDeadOrDying()) this.dots.clear();
+        }
     }
 
     @Override
