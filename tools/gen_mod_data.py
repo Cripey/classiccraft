@@ -337,6 +337,8 @@ def weapons(lang):
         write(f"data/mcwow/recipe/gun/{aid}.json", {
             "type": "minecraft:crafting_shapeless", "category": "equipment",
             "ingredients": ["minecraft:gunpowder", nugget, nugget], "result": {"id": f"mcwow:{aid}", "count": 32}})
+    lang["death.attack.mcwow.bullet"] = "%1$s was shot"
+    lang["death.attack.mcwow.bullet.player"] = "%1$s was shot by %2$s"
     for metal, (name, tint) in NUGGETS.items():
         nid = f"{metal}_nugget"
         write(f"assets/mcwow/items/{nid}.json", {"model": {"type": "minecraft:model", "model": "minecraft:item/iron_nugget",

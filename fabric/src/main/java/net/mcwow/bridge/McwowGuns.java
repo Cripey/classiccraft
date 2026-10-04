@@ -67,6 +67,9 @@ public final class McwowGuns {
     public static final List<String> NUGGETS = List.of("steel", "mithril", "thorium");
 
     public static Item RIFLE, BLUNDERBUSS;
+    /** A bullet's damage type (data/mcwow/damage_type/bullet.json): a projectile that bypasses the hit cooldown. */
+    public static final ResourceKey<net.minecraft.world.damagesource.DamageType> BULLET_DAMAGE =
+            ResourceKey.create(Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("mcwow", "bullet"));
 
     public static final ResourceKey<EntityType<?>> BULLET_KEY =
             ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath("mcwow", "bullet"));
@@ -264,11 +267,12 @@ public final class McwowGuns {
         protected void onHitEntity(EntityHitResult hit) {
             super.onHitEntity(hit);
             if (this.level() instanceof ServerLevel sl) {
-                // Every pellet counts: a hit's immunity frames would swallow the rest of the volley
-                // (2026-10-04 test: one blunderbuss pellet of six landed).
-                hit.getEntity().setInvulnerableTime(0);
-                hit.getEntity().hurtServer(sl, this.damageSources().mobProjectile(this,
-                        this.getOwner() instanceof LivingEntity le ? le : null), this.damage);
+                // Its own damage type, mcwow:bullet - a projectile that bypasses the hit cooldown, so
+                // every pellet of a volley counts (2026-10-04 test: one blunderbuss pellet of six landed;
+                // the cooldown is LivingEntity.damageCooldownTime in 26.3).
+                var type = sl.registryAccess().lookupOrThrow(Registries.DAMAGE_TYPE).getOrThrow(BULLET_DAMAGE);
+                hit.getEntity().hurtServer(sl, new net.minecraft.world.damagesource.DamageSource(type, this, this.getOwner()),
+                        this.damage);
             }
         }
 

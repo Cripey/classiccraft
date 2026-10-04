@@ -72,5 +72,7 @@
   "item.mcwow.thorium_shell": "Thorium Shells",
   "item.mcwow.steel_nugget": "Steel Nugget",
   "item.mcwow.mithril_nugget": "Mithril Nugget",
-  "item.mcwow.thorium_nugget": "Thorium Nugget"
+  "item.mcwow.thorium_nugget": "Thorium Nugget",
+  "death.attack.mcwow.bullet": "%1$s was shot",
+  "death.attack.mcwow.bullet.player": "%1$s was shot by %2$s"
 }
