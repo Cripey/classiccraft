@@ -271,6 +271,17 @@ public final class McwowVendors {
                 sell(o, Items.BLAST_FURNACE, 1, 4);
             }
             case "engineering" -> {
+                // Guns of the area's metal and the ammo its level allows (2026-10-04, user).
+                for (Item gun : new Item[] {McwowGuns.RIFLE, McwowGuns.BLUNDERBUSS}) {
+                    ItemStack g = new ItemStack(gun);
+                    ((McwowGuns.GunItem) gun).stamp(g, McwowGear.material(metal));
+                    sell(o, g, 4 * (t + 1));
+                }
+                for (int a = 0; a < McwowGuns.AMMO.size(); a++) {
+                    McwowGuns.Ammo ammo = McwowGuns.AMMO.get(a);
+                    if (ammo.req() > Math.max(level, 1) + 5) continue;
+                    sell(o, new ItemStack(BuiltInRegistries.ITEM.getValue(Identifier.fromNamespaceAndPath("mcwow", ammo.id())), 16), a + 1);
+                }
                 sell(o, Items.REDSTONE, 8, 1);
                 sell(o, Items.GUNPOWDER, 4, 2);
                 sell(o, Items.RAIL, 16, 2);
@@ -432,12 +443,25 @@ public final class McwowVendors {
         }
     }
 
+    /** Enchanting suppliers' wands (2026-10-04): one of each school, of the BUYER's metal tier. */
+    public static void wands(MerchantOffers out, int characterLevel) {
+        int t = tier(Math.max(1, characterLevel));
+        for (Item wand : McwowWands.WANDS.values()) {
+            ItemStack w = new ItemStack(wand);
+            ((McwowWands.WandItem) wand).stamp(w, McwowGear.material(METALS[t]));
+            sell(out, w, 3 * (t + 1));
+        }
+    }
+
     static void open(ServerPlayer p, int entry, String name) {
         Object[] v = vendor(entry);
         String type = (String) v[0];
         int level = (Integer) v[1];
         MerchantOffers offers = offersFor(entry);
-        if (type.equals("enchanting")) books(offers, McwowGear.wowLevel(), p.level().registryAccess());
+        if (type.equals("enchanting")) {
+            books(offers, McwowGear.wowLevel(), p.level().registryAccess());
+            wands(offers, McwowGear.wowLevel());
+        }
         applyStock(p.level().getServer(), entry, offers);
         WowMerchant m = new WowMerchant(offers, entry, p.level().getServer());
         m.setTradingPlayer(p);
