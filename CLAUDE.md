@@ -930,6 +930,9 @@ reference until classiccraft catches up.
    Guns: `McwowGuns` (GunItem rifle/blunderbuss, Bullet entity `mcwow:bullet`, ammo tiers `AMMO`, nuggets), shared
    stamping `McwowGear.Stampable` / `stampWeapon`; data in `gen_mod_data.py weapons()` (`GUN_MAPS` pixel art,
    recipes `data/mcwow/recipe/gun/`, tag `#mcwow:gun_metals`).
+   Sim: export `ranged` (per metal: wand/rifle/pellet damage, intervals, ammo tiers); knob `style`
+   (melee/wand/rifle/blunderbuss, plus `ranged_free_s`, `blunderbuss_free_s`, `pellet_hit`); every report compares
+   the four styles over the whole walk. Next: staves (AoE spells, summons).
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.

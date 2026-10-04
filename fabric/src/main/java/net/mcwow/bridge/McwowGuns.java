@@ -45,8 +45,11 @@ import net.minecraft.world.phys.Vec3;
  * at the gun's item level (its stamp; McwowActorEntity reads the bullet's weapon).
  */
 public final class McwowGuns {
-    public static final float RIFLE_SHARE = 1.5F, PELLET_SHARE = 0.4F;
-    public static final int PELLETS = 6, RIFLE_RELOAD = 32, BLUNDERBUSS_RELOAD = 48;
+    // Tuned with the progression sim (2026-10-04): 1.5x / 0.4x / 48 ticks were well behind melee.
+    public static final float RIFLE_SHARE = 2.2F, PELLET_SHARE = 0.6F;
+    public static final int PELLETS = 6, RIFLE_RELOAD = 32, BLUNDERBUSS_RELOAD = 40;
+    /** Shots per ammo craft (gunpowder + 2 nuggets) and per vendor lot. */
+    public static final int AMMO_PER_CRAFT = 32, AMMO_PER_LOT = 64;
     private static final float RIFLE_SPEED = 4.0F, PELLET_SPEED = 2.2F;
     private static final int RIFLE_LIFE = 15, PELLET_LIFE = 6;
 

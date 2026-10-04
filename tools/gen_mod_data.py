@@ -213,7 +213,7 @@ def wand_texture(school, gem):
     png(f"assets/mcwow/textures/item/{school}_wand.png", 16, 16, px)
 
 
-# Guns (McwowGuns, 2026-10-04): rifle and blunderbuss of any gun metal; ammo from gunpowder + 2 nuggets.
+# Guns (McwowGuns, 2026-10-04): rifle and blunderbuss of any gun metal; ammo from gunpowder + 2 nuggets (32 shots).
 GUN_METALS = [m for m in WAND_METALS if m != "minecraft:gold_ingot"]
 AMMO = {  # id: (name, metal colour, nugget)
     "light_shot": ("Light Shot", (0xC8, 0x7A, 0x50), "minecraft:copper_nugget"),
@@ -321,7 +321,7 @@ def weapons(lang):
         lang[f"item.mcwow.{aid}"] = name
         write(f"data/mcwow/recipe/gun/{aid}.json", {
             "type": "minecraft:crafting_shapeless", "category": "equipment",
-            "ingredients": ["minecraft:gunpowder", nugget, nugget], "result": {"id": f"mcwow:{aid}", "count": 16}})
+            "ingredients": ["minecraft:gunpowder", nugget, nugget], "result": {"id": f"mcwow:{aid}", "count": 32}})
     for metal, (name, tint) in NUGGETS.items():
         nid = f"{metal}_nugget"
         write(f"assets/mcwow/items/{nid}.json", {"model": {"type": "minecraft:model", "model": "minecraft:item/iron_nugget",

@@ -133,6 +133,7 @@ public final class McwowSimExport {
         r.add("brewing", brewing(server));
         r.add("enchanting", enchanting(server));
         r.add("chests", chests(server, wow));
+        r.add("ranged", ranged());
         r.add("blocks", blocks(server.overworld()));
         return r;
     }
@@ -275,6 +276,54 @@ public final class McwowSimExport {
                 LOGGER.warn("mcwow-bridge: sim export: recipe {} skipped: {}", h.id(), e.toString());
             }
         }
+        return out;
+    }
+
+    // ---- ranged weapons (McwowWands, McwowGuns) ----------------------------------------------------
+
+    /**
+     * Per material with a sword twin: a wand bolt's damage, a rifle bullet's and a blunderbuss
+     * pellet's (before ammo), their intervals (s) and the weapon's durability; the pellet count, the
+     * ammo tiers (multiplier, required level), cloth spell power and the damage-over-time share.
+     */
+    private static JsonObject ranged() {
+        JsonObject out = new JsonObject();
+        JsonObject mats = new JsonObject();
+        for (McwowGear.Material m : McwowGear.materials()) {
+            if (m.toolTwin() == null) continue;
+            ItemStack wand = new ItemStack(McwowWands.WANDS.get(McwowSpells.School.FIRE));
+            ((McwowWands.WandItem) wand.getItem()).stamp(wand, m);
+            ItemStack rifle = new ItemStack(McwowGuns.RIFLE);
+            ((McwowGuns.GunItem) rifle.getItem()).stamp(rifle, m);
+            JsonObject mo = new JsonObject();
+            mo.addProperty("ilvl", m.ilvl());
+            mo.addProperty("req", m.req());
+            mo.addProperty("wand", McwowWands.boltDamage(wand));
+            mo.addProperty("rifle", McwowGuns.swordHit(rifle) * McwowGuns.RIFLE_SHARE);
+            mo.addProperty("pellet", McwowGuns.swordHit(rifle) * McwowGuns.PELLET_SHARE);
+            Integer dur = rifle.get(DataComponents.MAX_DAMAGE);
+            mo.addProperty("durability", dur != null ? dur : 250);
+            mo.addProperty("repair", m.repair());
+            mats.add(m.id(), mo);
+        }
+        out.add("materials", mats);
+        out.addProperty("wand_interval", McwowWands.WAND_COOLDOWN / 20.0);
+        out.addProperty("rifle_interval", McwowGuns.RIFLE_RELOAD / 20.0);
+        out.addProperty("blunderbuss_interval", McwowGuns.BLUNDERBUSS_RELOAD / 20.0);
+        out.addProperty("pellets", McwowGuns.PELLETS);
+        out.addProperty("ammo_per_lot", McwowGuns.AMMO_PER_LOT);
+        out.addProperty("cloth_power", McwowWands.CLOTH_POWER);
+        out.addProperty("dot_share", McwowSpells.DOT_SHARE);
+        JsonArray ammo = new JsonArray();
+        for (McwowGuns.Ammo a : McwowGuns.AMMO) {
+            JsonObject ao = new JsonObject();
+            ao.addProperty("id", "mcwow:" + a.id());
+            ao.addProperty("multiplier", a.multiplier());
+            ao.addProperty("req", a.req());
+            ao.addProperty("nugget", a.nugget());
+            ammo.add(ao);
+        }
+        out.add("ammo", ammo);
         return out;
     }
 

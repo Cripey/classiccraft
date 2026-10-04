@@ -280,7 +280,8 @@ public final class McwowVendors {
                 for (int a = 0; a < McwowGuns.AMMO.size(); a++) {
                     McwowGuns.Ammo ammo = McwowGuns.AMMO.get(a);
                     if (ammo.req() > Math.max(level, 1) + 5) continue;
-                    sell(o, new ItemStack(BuiltInRegistries.ITEM.getValue(Identifier.fromNamespaceAndPath("mcwow", ammo.id())), 16), a + 1);
+                    sell(o, new ItemStack(BuiltInRegistries.ITEM.getValue(Identifier.fromNamespaceAndPath("mcwow", ammo.id())),
+                            McwowGuns.AMMO_PER_LOT), a + 1);
                 }
                 sell(o, Items.REDSTONE, 8, 1);
                 sell(o, Items.GUNPOWDER, 4, 2);

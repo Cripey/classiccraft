@@ -60,6 +60,10 @@ KNOBS = {
     "enchant_visit_levels": 3,  # at least this many levels apart
     "enchant_visit_s": 420,     # the trip (there, shop, back)
     "emerald_reserve": 16,      # emeralds kept back from books for food and repairs
+    "style": "melee",        # melee | wand | rifle | blunderbuss: the weapon fights use (ranged ones of the melee weapon's metal)
+    "ranged_free_s": 3.0,    # a wand/rifle fight's opening seconds before the creature reaches the player
+    "blunderbuss_free_s": 0.8,  # ... a blunderbuss's (short range)
+    "pellet_hit": 0.7,       # share of a blunderbuss's pellets that hit
 }
 NOT_MODELLED = ("enchantments besides sharpness/smite/bane/protection/unbreaking", "anvil costs", "bows/crossbows and arrows", "shields", "potions",
                 "dungeons and group quests", "travel between zones", "rested XP", "quest chains across zones",
@@ -245,9 +249,40 @@ class Sim:
         return sum((g["gear"][1] if g and g.get("gear") and g["gear"][2] <= self.level else 0)
                    for s, g in self.gear.items() if s != "weapon") / 4.0
 
+    def ranged(self):
+        """The ranged weapon the style fights with: {per_shot Minecraft damage, interval s, ilvl, free s,
+        ammo_cost emeralds per shot}, of the melee weapon's metal (a wand or gun crafted from the same
+        bar); None for melee."""
+        style = self.knob("style")
+        rg = self.r.get("ranged")
+        if style == "melee" or not rg:
+            return None
+        w = self.weapon()
+        mat = w["gear"][0] if w.get("gear") and w["gear"][0] in rg["materials"] else "copper"
+        m = rg["materials"][mat]
+        ilvl = w["gear"][1] if w.get("gear") and w["gear"][0] == mat else m["ilvl"]
+        if style == "wand":
+            cloth = sum(1 for s, g in self.gear.items() if s != "weapon" and g and g.get("class") == "cloth"
+                        and g.get("gear") and g["gear"][2] <= self.level)
+            dmg = m["wand"] * (1 + rg["cloth_power"] * cloth) * (1 + rg["dot_share"])  # a fire wand: its burn on top
+            return {"per_shot": dmg, "interval": rg["wand_interval"], "ilvl": ilvl, "free": self.knob("ranged_free_s"),
+                    "ammo_cost": 0.0}
+        tiers = [a for a in rg["ammo"] if a["req"] <= self.level]
+        tier_i = len(tiers) - 1
+        mult = tiers[-1]["multiplier"] if tiers else 1.0
+        cost = (tier_i + 1) / rg.get("ammo_per_lot", 16)  # engineering vendors: a lot of shots for tier+1 emeralds
+        if style == "rifle":
+            return {"per_shot": m["rifle"] * mult, "interval": rg["rifle_interval"], "ilvl": ilvl,
+                    "free": self.knob("ranged_free_s"), "ammo_cost": cost}
+        return {"per_shot": m["pellet"] * mult * rg["pellets"] * self.knob("pellet_hit"), "interval": rg["blunderbuss_interval"],
+                "ilvl": ilvl, "free": self.knob("blunderbuss_free_s"), "ammo_cost": cost}
+
     def fight(self, entry):
         """One fight against a creature: time to kill, Minecraft damage taken, death chance."""
         c = self.c[str(entry)]
+        rw = self.ranged()
+        if rw:
+            return self.ranged_fight(c, rw)
         w = self.weapon()
         ilvl = w["gear"][1] if w.get("gear") else 1
         on = self.knob("enchanting")
@@ -265,6 +300,23 @@ class Sim:
         safe = self.knob("safe_dmg")
         death = 1.0 if dmg >= 20 else max(0.0, (dmg - safe) / (20 - safe)) * 0.5
         return {"ttk": ttk, "dmg": dmg, "death": death, "hits": hits, "taken": swings, "level": c["level"]}
+
+    def ranged_fight(self, c, rw):
+        """A fight with a wand or gun: shots at its interval; the creature lands no hits for the
+        opening free seconds (it is still closing in)."""
+        wow_hit = max(1.0, (rw["per_shot"] + self.alchemy.strength()) * self.wow_per_mc[min(63, max(1, rw["ilvl"])) - 1])
+        hits = math.ceil(max(1, c["hp"]) / wow_hit) / self.knob("hit_rate")
+        ttk = hits * rw["interval"] + self.knob("approach_s")
+        lvl = min(63, max(1, c["level"]))
+        factor = self.af[lvl - 1][min(70, round(self.armor_ilvl()))]
+        per_hit = self.mitigate(c["hit"] * self.mc_per_wow[lvl - 1] * self.curve[lvl - 1] * factor,
+                                c.get("spell_share", 0.0), self.gear)
+        swings = max(0.0, ttk - rw["free"]) / (c["attack_ms"] / 1000.0) * self.knob("creature_hit_rate")
+        dmg = swings * per_hit
+        safe = self.knob("safe_dmg")
+        death = 1.0 if dmg >= 20 else max(0.0, (dmg - safe) / (20 - safe)) * 0.5
+        return {"ttk": ttk, "dmg": dmg, "death": death, "hits": hits, "taken": swings, "level": c["level"],
+                "ammo_cost": rw["ammo_cost"] * hits}
 
     def kill(self, entry, n, kind):
         """n kills of a creature in chunks (repairs, food and level-ups in between). False if it
@@ -302,6 +354,11 @@ class Sim:
         r["fights"].append((n, f["ttk"], f["dmg"], c["level"], int(entry)))
         on = self.knob("enchanting")
         self.wear["weapon"] += f["hits"] * n * self.knob("durability_hits") * wear_factor(self.gear["weapon"], False, on)
+        if f.get("ammo_cost"):
+            cost = f["ammo_cost"] * n
+            self.take("minecraft:emerald", cost, "ammo")
+            if self.inv["minecraft:emerald"] < 0:
+                self.row()["ammo_short"] = self.row().get("ammo_short", 0) + 1
         for s in ARMOR:
             if self.gear[s]:
                 # vanilla: each armor piece loses max(1, damage / 4) per hit taken
@@ -1012,7 +1069,7 @@ def find_flags(sim, rows):
     return flags, reasons
 
 
-def write_report(sim, out_dir, baseline_path, without=None, plain=None):
+def write_report(sim, out_dir, baseline_path, without=None, plain=None, styles=None):
     rows = summarize(sim)
     flags, reasons = find_flags(sim, rows)
     for c in curve_table(sim):
@@ -1059,6 +1116,18 @@ def write_report(sim, out_dir, baseline_path, without=None, plain=None):
         report["treasure"] = {"hours_vs_without": d_h, "deaths_vs_without": d_deaths,
                               "opened": dict(sim.treasure.opened), "books": dict(sim.treasure.books),
                               "applied": sim.treasure.applied, "unused": dict(sim.treasure.unused)}
+    if styles:
+        deaths = lambda x: sum(r["deaths"] for r in x.rows.values())
+        parts, report["styles"] = [], {}
+        for st, x in styles.items():
+            em = x.ledger["minecraft:emerald"]
+            short = sum(r.get("ammo_short", 0) for r in x.rows.values())
+            parts.append(f"{st} {x.t / 3600:.1f} h / {deaths(x):.1f} deaths" + (f" / {em['ammo']:.0f} emeralds on ammo" if em["ammo"] else "")
+                         + (f" (ammo unaffordable in {short} fights)" if short else ""))
+            report["styles"][st] = {"hours": round(x.t / 3600, 1), "deaths": round(deaths(x), 1), "ammo": round(em["ammo"], 1),
+                                    "ammo_short": short}
+        L.append(f"Fighting styles (whole walk with that weapon, else the same): melee {sim.t / 3600:.1f} h / "
+                 f"{deaths(sim):.1f} deaths; " + "; ".join(parts) + ".")
     diff = diff_report(report, baseline_path)
     if diff:
         L.append("\n## Changes vs baseline")
@@ -1231,7 +1300,8 @@ def main():
         return
     without = run_sim(*data, alchemy=False)  # what alchemy is worth
     plain = run_sim(*data, chests=False, enchanting=False)  # what chests and enchanting are worth
-    rep = write_report(sim, out_dir, baseline, without, plain)
+    styles = {st: run_sim(*data, style=st) for st in ("wand", "rifle", "blunderbuss")} if data[1].get("ranged") else {}
+    rep = write_report(sim, out_dir, baseline, without, plain, styles)
     print(f"sim: level {sim.level} in {rep['total_hours']} h, {rep['quests_done']} quests, "
           f"{len(rep['flags'])} flags -> {os.path.join(out_dir, 'report.md')}")
 
