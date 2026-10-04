@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    "minecraft:gunpowder",
+    "mcwow:steel_nugget",
+    "mcwow:steel_nugget"
+  ],
+  "result": {
+    "id": "mcwow:solid_shot",
+    "count": 16
+  }
+}

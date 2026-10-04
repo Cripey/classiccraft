@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "mcwow:steel_bar"
+  ],
+  "result": {
+    "id": "mcwow:steel_nugget",
+    "count": 9
+  }
+}

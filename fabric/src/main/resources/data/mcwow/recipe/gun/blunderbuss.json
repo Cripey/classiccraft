@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "M M",
+    " M ",
+    "TP "
+  ],
+  "key": {
+    "M": "#mcwow:gun_metals",
+    "T": "minecraft:tripwire_hook",
+    "P": "#minecraft:planks"
+  },
+  "result": {
+    "id": "mcwow:blunderbuss"
+  }
+}

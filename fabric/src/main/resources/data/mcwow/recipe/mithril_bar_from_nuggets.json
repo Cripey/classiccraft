@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "NNN",
+    "NNN",
+    "NNN"
+  ],
+  "key": {
+    "N": "mcwow:mithril_nugget"
+  },
+  "result": {
+    "id": "mcwow:mithril_bar"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    "minecraft:gunpowder",
+    "mcwow:mithril_nugget",
+    "mcwow:mithril_nugget"
+  ],
+  "result": {
+    "id": "mcwow:mithril_gyro_shot",
+    "count": 16
+  }
+}

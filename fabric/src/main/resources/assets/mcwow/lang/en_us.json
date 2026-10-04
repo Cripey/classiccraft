@@ -62,5 +62,15 @@
   "death.attack.mcwow.spell_shadow.player": "%1$s was slain by %2$s's shadow magic",
   "item.mcwow.arcane_wand": "Wand of Arcane",
   "death.attack.mcwow.spell_arcane": "%1$s was slain by arcane magic",
-  "death.attack.mcwow.spell_arcane.player": "%1$s was slain by %2$s's arcane magic"
+  "death.attack.mcwow.spell_arcane.player": "%1$s was slain by %2$s's arcane magic",
+  "item.mcwow.rifle": "Rifle",
+  "item.mcwow.blunderbuss": "Blunderbuss",
+  "item.mcwow.light_shot": "Light Shot",
+  "item.mcwow.heavy_shot": "Heavy Shot",
+  "item.mcwow.solid_shot": "Solid Shot",
+  "item.mcwow.mithril_gyro_shot": "Mithril Gyro-Shot",
+  "item.mcwow.thorium_shell": "Thorium Shells",
+  "item.mcwow.steel_nugget": "Steel Nugget",
+  "item.mcwow.mithril_nugget": "Mithril Nugget",
+  "item.mcwow.thorium_nugget": "Thorium Nugget"
 }

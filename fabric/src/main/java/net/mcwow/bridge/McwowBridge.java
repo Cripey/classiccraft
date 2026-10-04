@@ -20,6 +20,7 @@ public final class McwowBridge implements ModInitializer {
         McwowTrees.register(); // WoW trees chopped for logs
         McwowAnvils.register(); // WoW anvils open Minecraft's anvil screen
         McwowWands.register(); // wands: spell bolts of WoW's schools
+        McwowGuns.register(); // rifles, blunderbusses and their ammo
         McwowWowWeapons.register(); // weapons drawn with WoW item models (local art)
         McwowQuestRewards.register(); // quest rewards as Minecraft items and emeralds
         McwowCommands.register(); // /mcwow digging, /mcwow mine reset

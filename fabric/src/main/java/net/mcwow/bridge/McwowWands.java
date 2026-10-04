@@ -102,24 +102,10 @@ public final class McwowWands {
             CreativeModeTabEvents.modifyOutputEvent(ResourceKey.create(Registries.CREATIVE_MODE_TAB,
                     Identifier.withDefaultNamespace("combat"))).register(out -> {
                         ItemStack s = new ItemStack(item);
-                        stamp(s, McwowGear.material("copper"));
+                        ((WandItem) item).stamp(s, McwowGear.material("copper"));
                         out.accept(s);
                     });
         }
-    }
-
-    /** A wand of a material: its name, item level, durability (its sword twin's) and repair bar. */
-    public static void stamp(ItemStack stack, McwowGear.Material m) {
-        if (m == null || !(stack.getItem() instanceof WandItem w)) return;
-        Item twin = BuiltInRegistries.ITEM.getValue(Identifier.withDefaultNamespace(m.toolTwin() + "_sword"));
-        Integer max = twin.components().get(DataComponents.MAX_DAMAGE);
-        if (max != null) stack.set(DataComponents.MAX_DAMAGE, Math.max(1, Math.round(max * m.durability())));
-        if (m.repair() != null) {
-            stack.set(DataComponents.REPAIRABLE, new net.minecraft.world.item.enchantment.Repairable(
-                    net.minecraft.core.HolderSet.direct(BuiltInRegistries.ITEM.getValue(Identifier.parse(m.repair())).builtInRegistryHolder())));
-        }
-        stack.set(DataComponents.ITEM_NAME, Component.literal(m.title() + " Wand of " + w.school.title()));
-        stack.set(McwowGear.GEAR, new McwowGear.Gear(m.id(), m.ilvl(), m.req()));
     }
 
     /** A bolt's base damage: BOLT_SHARE of the wand material's sword hit (an unstamped wand: copper's). */
@@ -144,12 +130,17 @@ public final class McwowWands {
     }
 
     /** A wand: right-click fires a bolt of its school. */
-    public static final class WandItem extends Item {
+    public static final class WandItem extends Item implements McwowGear.Stampable {
         public final McwowSpells.School school;
 
         public WandItem(McwowSpells.School school, Item.Properties props) {
             super(props);
             this.school = school;
+        }
+
+        @Override
+        public void stamp(ItemStack stack, McwowGear.Material m) {
+            McwowGear.stampWeapon(stack, m, m.title() + " Wand of " + school.title());
         }
 
         @Override

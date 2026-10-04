@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "mcwow:mithril_bar"
+  ],
+  "result": {
+    "id": "mcwow:mithril_nugget",
+    "count": 9
+  }
+}

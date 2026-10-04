@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    "minecraft:gunpowder",
+    "minecraft:copper_nugget",
+    "minecraft:copper_nugget"
+  ],
+  "result": {
+    "id": "mcwow:light_shot",
+    "count": 16
+  }
+}

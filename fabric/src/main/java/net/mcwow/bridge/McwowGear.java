@@ -198,12 +198,12 @@ public final class McwowGear {
 
     /** ShapedRecipeMixin: a crafted piece takes the material that lay in the grid. */
     public static void stampCrafted(ItemStack result, CraftingInput input) {
-        if (result.getItem() instanceof McwowWands.WandItem) {
-            // A wand (2026-10-04): the bar in the grid is its material.
+        if (result.getItem() instanceof Stampable st) {
+            // Our own weapons (wands, guns - 2026-10-04): the bar in the grid is the material.
             for (ItemStack in : input.items()) {
                 String mat = in.isEmpty() ? null : BY_INGREDIENT.get(in.getItem());
                 if (mat != null && MATERIALS.get(mat).toolTwin() != null) {
-                    McwowWands.stamp(result, MATERIALS.get(mat));
+                    st.stamp(result, MATERIALS.get(mat));
                     return;
                 }
             }
@@ -220,6 +220,27 @@ public final class McwowGear {
             if (mat != null) break;
         }
         if (mat != null) stamp(result, MATERIALS.get(mat), piece);
+    }
+
+    /** One of our own weapons (wand, gun): stamped with the material it was crafted from. */
+    public interface Stampable {
+        void stamp(ItemStack stack, Material m);
+    }
+
+    /**
+     * A weapon of our own (wand, gun) of a material: its name, item level and required level, the
+     * durability of the material's sword and its repair bar.
+     */
+    public static void stampWeapon(ItemStack stack, Material m, String name) {
+        if (m == null) return;
+        Item twin = item("minecraft:" + m.toolTwin() + "_sword");
+        Integer max = twin.components().get(DataComponents.MAX_DAMAGE);
+        if (max != null) stack.set(DataComponents.MAX_DAMAGE, Math.max(1, Math.round(max * m.durability())));
+        if (m.repair() != null) {
+            stack.set(DataComponents.REPAIRABLE, new Repairable(HolderSet.direct(item(m.repair()).builtInRegistryHolder())));
+        }
+        stack.set(DataComponents.ITEM_NAME, Component.literal(name));
+        stack.set(GEAR, new Gear(m.id(), m.ilvl(), m.req()));
     }
 
     /** Make a piece of the material: name, stats of its twin, durability, repair item, dye. */

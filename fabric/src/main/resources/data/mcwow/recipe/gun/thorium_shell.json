@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    "minecraft:gunpowder",
+    "mcwow:thorium_nugget",
+    "mcwow:thorium_nugget"
+  ],
+  "result": {
+    "id": "mcwow:thorium_shell",
+    "count": 16
+  }
+}

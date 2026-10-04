@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "mcwow:thorium_bar"
+  ],
+  "result": {
+    "id": "mcwow:thorium_nugget",
+    "count": 9
+  }
+}

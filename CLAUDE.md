@@ -927,6 +927,9 @@ reference until classiccraft catches up.
    sprite + particles, `stamp` from the grid's bar via `McwowGear.stampCrafted`, `spellPower` = cloth bonus);
    data from `tools/gen_mod_data.py weapons()` (textures, models, recipes `data/mcwow/recipe/wand/`, tag
    `#mcwow:wand_metals`, names, spell death messages).
+   Guns: `McwowGuns` (GunItem rifle/blunderbuss, Bullet entity `mcwow:bullet`, ammo tiers `AMMO`, nuggets), shared
+   stamping `McwowGear.Stampable` / `stampWeapon`; data in `gen_mod_data.py weapons()` (`GUN_MAPS` pixel art,
+   recipes `data/mcwow/recipe/gun/`, tag `#mcwow:gun_metals`).
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.

@@ -98,6 +98,8 @@ public final class McwowBridgeClient implements ClientModInitializer {
         // Wand bolts: their school's item sprite (McwowWands.LOOK) plus particles.
         net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
                 net.mcwow.bridge.McwowWands.BOLT, net.minecraft.client.renderer.entity.ThrownItemRenderer::new);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
+                net.mcwow.bridge.McwowGuns.BULLET, net.minecraft.client.renderer.entity.ThrownItemRenderer::new);
         // Diagnostic: what the crosshair is on, when it's a stand-in (throttled), to check the
         // boxes line up with WoW's creatures.
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {

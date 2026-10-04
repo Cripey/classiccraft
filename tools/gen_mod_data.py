@@ -213,7 +213,128 @@ def wand_texture(school, gem):
     png(f"assets/mcwow/textures/item/{school}_wand.png", 16, 16, px)
 
 
+# Guns (McwowGuns, 2026-10-04): rifle and blunderbuss of any gun metal; ammo from gunpowder + 2 nuggets.
+GUN_METALS = [m for m in WAND_METALS if m != "minecraft:gold_ingot"]
+AMMO = {  # id: (name, metal colour, nugget)
+    "light_shot": ("Light Shot", (0xC8, 0x7A, 0x50), "minecraft:copper_nugget"),
+    "heavy_shot": ("Heavy Shot", (0xB8, 0xB8, 0xB8), "minecraft:iron_nugget"),
+    "solid_shot": ("Solid Shot", (0x9A, 0xA6, 0xB4), "mcwow:steel_nugget"),
+    "mithril_gyro_shot": ("Mithril Gyro-Shot", (0x7A, 0xD0, 0xC8), "mcwow:mithril_nugget"),
+    "thorium_shell": ("Thorium Shells", (0xE0, 0x8A, 0x40), "mcwow:thorium_nugget"),
+}
+NUGGETS = {"steel": ("Steel Nugget", 0x9AA6B4), "mithril": ("Mithril Nugget", 0x7AD0C8), "thorium": ("Thorium Nugget", 0xE08A40)}
+
+
+def canvas():
+    px = [0] * (16 * 16 * 4)
+    def put(x, y, c, a=255):
+        if 0 <= x < 16 and 0 <= y < 16:
+            px[(y * 16 + x) * 4:(y * 16 + x) * 4 + 4] = [*c, a]
+    return px, put
+
+
+GUN_PALETTE = {
+    "H": (0xB0, 0x7A, 0x4A), "W": (0x8A, 0x5A, 0x34), "w": (0x5A, 0x3A, 0x22),  # wood: light, mid, dark
+    "L": (0xD4, 0xDA, 0xE2), "S": (0x92, 0x98, 0xA2), "s": (0x56, 0x5C, 0x66),  # steel: light, mid, dark
+    "K": (0x34, 0x34, 0x3A), "D": (0x1C, 0x1C, 0x20), "B": (0xC8, 0x9A, 0x40),  # lock, bore, brass
+}
+GUN_MAPS = {
+    # Our own pixel art (2026-10-04): stock bottom left, barrel to the top right.
+    "rifle": [
+        "................",
+        ".............LS.",
+        "............LSs.",
+        "...........LSs..",
+        "..........LSs...",
+        ".........LSs....",
+        "........LSs.....",
+        ".......HWs......",
+        "......HWw.......",
+        ".....BKw........",
+        "....HKKw........",
+        "...HWWw.........",
+        "..HWWWw.........",
+        ".HWWWw..........",
+        ".WWww...........",
+        "................",
+    ],
+    "blunderbuss": [
+        "...........LLL..",
+        "..........LSSSs.",
+        "..........SDDSs.",
+        "...........SDSs.",
+        "..........LSs...",
+        ".........LSs....",
+        "........LSs.....",
+        ".......HWs......",
+        "......HWw.......",
+        ".....BKw........",
+        "....HKKw........",
+        "...HWWw.........",
+        "..HWWWw.........",
+        ".HWWWw..........",
+        ".WWww...........",
+        "................",
+    ],
+}
+
+
+def gun_texture(name, blunderbuss):
+    """Our own 16x16 gun from GUN_MAPS (blunderbuss: the flared muzzle)."""
+    px, put = canvas()
+    for y, row in enumerate(GUN_MAPS[name]):
+        for x, ch in enumerate(row):
+            if ch in GUN_PALETTE:
+                put(x, y, GUN_PALETTE[ch])
+    png(f"assets/mcwow/textures/item/{name}.png", 16, 16, px)
+
+
+def ammo_texture(aid, color):
+    """A few round shots in a little heap, lit from the top left."""
+    px, put = canvas()
+    for cx, cy in ((5, 11), (9, 11), (7, 8), (11, 9), (4, 8)):
+        for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+            put(cx + dx, cy + dy, shade(color, 0.85))
+        put(cx, cy, shade(color, 1.2))
+        put(cx + 1, cy + 1, shade(color, 0.55))
+    png(f"assets/mcwow/textures/item/{aid}.png", 16, 16, px)
+
+
 def weapons(lang):
+    write("data/mcwow/tags/item/gun_metals.json", {"replace": False, "values": GUN_METALS})
+    for gun, flared, name, pattern in (("rifle", False, "Rifle", ["MMM", " TP"]),
+                                       ("blunderbuss", True, "Blunderbuss", ["M M", " M ", "TP "])):
+        gun_texture(gun, flared)
+        write(f"assets/mcwow/models/item/{gun}.json", {"parent": "minecraft:item/handheld",
+                                                       "textures": {"layer0": f"mcwow:item/{gun}"}})
+        write(f"assets/mcwow/items/{gun}.json", {"model": {"type": "minecraft:model", "model": f"mcwow:item/{gun}"}})
+        lang[f"item.mcwow.{gun}"] = name
+        write(f"data/mcwow/recipe/gun/{gun}.json", {
+            "type": "minecraft:crafting_shaped", "category": "equipment", "pattern": pattern,
+            "key": {"M": "#mcwow:gun_metals", "T": "minecraft:tripwire_hook", "P": "#minecraft:planks"},
+            "result": {"id": f"mcwow:{gun}"}})
+    for aid, (name, color, nugget) in AMMO.items():
+        ammo_texture(aid, color)
+        write(f"assets/mcwow/models/item/{aid}.json", {"parent": "minecraft:item/generated",
+                                                       "textures": {"layer0": f"mcwow:item/{aid}"}})
+        write(f"assets/mcwow/items/{aid}.json", {"model": {"type": "minecraft:model", "model": f"mcwow:item/{aid}"}})
+        lang[f"item.mcwow.{aid}"] = name
+        write(f"data/mcwow/recipe/gun/{aid}.json", {
+            "type": "minecraft:crafting_shapeless", "category": "equipment",
+            "ingredients": ["minecraft:gunpowder", nugget, nugget], "result": {"id": f"mcwow:{aid}", "count": 16}})
+    for metal, (name, tint) in NUGGETS.items():
+        nid = f"{metal}_nugget"
+        write(f"assets/mcwow/items/{nid}.json", {"model": {"type": "minecraft:model", "model": "minecraft:item/iron_nugget",
+                                                          "tints": [{"type": "minecraft:constant", "value": tint - 0x1000000}]}})
+        lang[f"item.mcwow.{nid}"] = name
+        write(f"data/mcwow/recipe/{nid}.json", {"type": "minecraft:crafting_shapeless", "category": "misc",
+                                               "ingredients": [f"mcwow:{metal}_bar"], "result": {"id": f"mcwow:{nid}", "count": 9}})
+        write(f"data/mcwow/recipe/{metal}_bar_from_nuggets.json", {
+            "type": "minecraft:crafting_shaped", "category": "misc", "pattern": ["NNN", "NNN", "NNN"],
+            "key": {"N": f"mcwow:{nid}"}, "result": {"id": f"mcwow:{metal}_bar"}})
+
+
+def wands(lang):
     write("data/mcwow/tags/item/wand_metals.json", {"replace": False, "values": WAND_METALS})
     for school, (name, gem, catalyst) in WAND_SCHOOLS.items():
         wid = f"{school}_wand"
@@ -292,6 +413,7 @@ def main():
     for tool, ids in by_tool.items():
         tag(f"data/minecraft/tags/block/{TOOL_TAG[tool]}.json", ids)
 
+    wands(lang)
     weapons(lang)
     with open(lang_path, "w") as f:
         json.dump(lang, f, indent=2)

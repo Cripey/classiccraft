@@ -1,0 +1,12 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:copper_ingot",
+    "mcwow:bronze_bar",
+    "minecraft:iron_ingot",
+    "mcwow:steel_bar",
+    "mcwow:mithril_bar",
+    "mcwow:thorium_bar",
+    "mcwow:dark_iron_bar"
+  ]
+}
