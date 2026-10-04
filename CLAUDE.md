@@ -738,6 +738,17 @@ reference until classiccraft catches up.
    `development`; both built clean first), the `classiccraft` branches deleted. Personal paths live in the gitignored `tools/local.env`. Further
    commits/pushes still wait for the user.
 14. **Next** (2026-10-04 wrap-up; design in project memory `game-design`).
+   - Setup/distribution (2026-10-04, pushed as 49fd84a): player setup verified on a fresh copy
+     (private DB, server + GM account, Fabric profile into a stand-in launcher dir). OPEN: the mod
+     in the OFFICIAL launcher (installed into ~/.minecraft, profile "classiccraft", gameDir
+     ~/.minecraft/classiccraft - never launched yet); a real login on a fresh install; Arch-native
+     and fresh-machine package installs; minecraft-install.sh should warn when the launcher is
+     open (it can overwrite launcher_profiles.json on exit). A friend's Arch + Ubuntu-distrobox
+     guide is an artifact (claude.ai/artifact/Ad46dLEKViCBBM5uYbAMvn). Windows support later (user).
+     No LICENSE file yet (fabric.mod.json says MIT) - user to decide.
+   - The running mangosd predates the forks' rebase onto upstream (benilla main af9bc978, VMaNGOS
+     development 66dd40fff, both built): `tools/server.sh stop && tools/build.sh server &&
+     tools/server.sh start` when the user isn't playing.
    - Test first (built, not yet confirmed live): 13v race intro (skip with ESC from Minecraft mode,
      no fall; also a full unskipped intro), 13u zone ores (copper in Elwynn, tin in Westfall, iron in
      Duskwood; rares 16-24+ blocks down), 13t leftovers (caves walling themselves as you walk, water
