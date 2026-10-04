@@ -279,14 +279,14 @@ GUN_MAPS = {
 }
 
 
-# Held like a gun (user, 2026-10-04: not straight up like a sword): the sword pose (item/handheld:
-# rotation y -90 puts the sprite's top right away from the player) turned about z so the drawn
-# 45-degree barrel lies level, stock at the hand; a little larger and further forward.
+# Held like a gun (user, 2026-10-04: not straight up like a sword). z turns the drawn 45-degree
+# barrel level first (in the sprite's plane), then y +90 points the sprite's right side - the
+# barrel - away from the player (-90, the sword's, pointed it back at them: first live try).
 GUN_DISPLAY = {
-    "thirdperson_righthand": {"rotation": [0, -90, -45], "translation": [0, 2.5, 2.0], "scale": [0.95, 0.95, 0.95]},
-    "thirdperson_lefthand": {"rotation": [0, 90, 45], "translation": [0, 2.5, 2.0], "scale": [0.95, 0.95, 0.95]},
-    "firstperson_righthand": {"rotation": [0, -90, -40], "translation": [1.5, 2.6, 0.5], "scale": [0.75, 0.75, 0.75]},
-    "firstperson_lefthand": {"rotation": [0, 90, 40], "translation": [1.5, 2.6, 0.5], "scale": [0.75, 0.75, 0.75]},
+    "thirdperson_righthand": {"rotation": [0, 90, -45], "translation": [0, 2.5, 0.5], "scale": [0.95, 0.95, 0.95]},
+    "thirdperson_lefthand": {"rotation": [0, -90, 45], "translation": [0, 2.5, 0.5], "scale": [0.95, 0.95, 0.95]},
+    "firstperson_righthand": {"rotation": [0, 90, -40], "translation": [1.5, 2.6, 0.5], "scale": [0.75, 0.75, 0.75]},
+    "firstperson_lefthand": {"rotation": [0, -90, 40], "translation": [1.5, 2.6, 0.5], "scale": [0.75, 0.75, 0.75]},
 }
 
 
