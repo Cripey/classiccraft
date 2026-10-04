@@ -1,6 +1,76 @@
 {
-  "parent": "minecraft:item/handheld",
+  "parent": "minecraft:item/generated",
   "textures": {
     "layer0": "mcwow:item/rifle"
+  },
+  "display": {
+    "thirdperson_righthand": {
+      "rotation": [
+        0,
+        -90,
+        -45
+      ],
+      "translation": [
+        0,
+        2.5,
+        2.0
+      ],
+      "scale": [
+        0.95,
+        0.95,
+        0.95
+      ]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [
+        0,
+        90,
+        45
+      ],
+      "translation": [
+        0,
+        2.5,
+        2.0
+      ],
+      "scale": [
+        0.95,
+        0.95,
+        0.95
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        0,
+        -90,
+        -40
+      ],
+      "translation": [
+        1.5,
+        2.6,
+        0.5
+      ],
+      "scale": [
+        0.75,
+        0.75,
+        0.75
+      ]
+    },
+    "firstperson_lefthand": {
+      "rotation": [
+        0,
+        90,
+        40
+      ],
+      "translation": [
+        1.5,
+        2.6,
+        0.5
+      ],
+      "scale": [
+        0.75,
+        0.75,
+        0.75
+      ]
+    }
   }
 }

@@ -279,6 +279,17 @@ GUN_MAPS = {
 }
 
 
+# Held like a gun (user, 2026-10-04: not straight up like a sword): the sword pose (item/handheld:
+# rotation y -90 puts the sprite's top right away from the player) turned about z so the drawn
+# 45-degree barrel lies level, stock at the hand; a little larger and further forward.
+GUN_DISPLAY = {
+    "thirdperson_righthand": {"rotation": [0, -90, -45], "translation": [0, 2.5, 2.0], "scale": [0.95, 0.95, 0.95]},
+    "thirdperson_lefthand": {"rotation": [0, 90, 45], "translation": [0, 2.5, 2.0], "scale": [0.95, 0.95, 0.95]},
+    "firstperson_righthand": {"rotation": [0, -90, -40], "translation": [1.5, 2.6, 0.5], "scale": [0.75, 0.75, 0.75]},
+    "firstperson_lefthand": {"rotation": [0, 90, 40], "translation": [1.5, 2.6, 0.5], "scale": [0.75, 0.75, 0.75]},
+}
+
+
 def gun_texture(name, blunderbuss):
     """Our own 16x16 gun from GUN_MAPS (blunderbuss: the flared muzzle)."""
     px, put = canvas()
@@ -305,8 +316,9 @@ def weapons(lang):
     for gun, flared, name, pattern in (("rifle", False, "Rifle", ["MMM", " TP"]),
                                        ("blunderbuss", True, "Blunderbuss", ["M M", " M ", "TP "])):
         gun_texture(gun, flared)
-        write(f"assets/mcwow/models/item/{gun}.json", {"parent": "minecraft:item/handheld",
-                                                       "textures": {"layer0": f"mcwow:item/{gun}"}})
+        write(f"assets/mcwow/models/item/{gun}.json", {"parent": "minecraft:item/generated",
+                                                       "textures": {"layer0": f"mcwow:item/{gun}"},
+                                                       "display": GUN_DISPLAY})
         write(f"assets/mcwow/items/{gun}.json", {"model": {"type": "minecraft:model", "model": f"mcwow:item/{gun}"}})
         lang[f"item.mcwow.{gun}"] = name
         write(f"data/mcwow/recipe/gun/{gun}.json", {
