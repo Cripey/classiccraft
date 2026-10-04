@@ -1,26 +1,75 @@
 #!/usr/bin/env bash
-# Start/stop/status for MariaDB inside the distrobox (no systemd here).
-# Usage: tools/db.sh start|stop|status
+# MariaDB for the classiccraft server (port CC_DB_PORT, see tools/config.sh).
+# CC_DB_MODE=private (default): our own instance in data/mariadb, run as you - no sudo.
+# CC_DB_MODE=system: the system MariaDB (systemd if present, else sudo mysqld_safe - distrobox).
+# Usage: tools/db.sh start|stop|status|init|sql [mariadb args...]
+#   init: create the private instance's data directory (setup.sh does this)
+#   sql:  a mariadb client with admin rights (no password), e.g. tools/db.sh sql -e "show databases"
 set -euo pipefail
+. "$(dirname "$0")/config.sh"
 
-sock=/run/mysqld/mysqld.sock
+if [[ $CC_DB_MODE == private ]]; then
+  sock="$CC_DB_SOCKET"
+  admin() { mariadb --no-defaults --socket="$sock" "$@"; }
+  ping() { mariadb-admin --no-defaults --socket="$sock" ping >/dev/null 2>&1; }
+else
+  sock=/run/mysqld/mysqld.sock
+  admin() { sudo mariadb --socket="$sock" "$@"; }
+  ping() { sudo mariadb-admin --socket="$sock" ping >/dev/null 2>&1; }
+fi
+running() { ping; }
 
-running() { sudo mariadb-admin --socket="$sock" ping >/dev/null 2>&1; }
+wait_up() {
+  for _ in $(seq 100); do running && return 0; sleep 0.2; done
+  return 1
+}
 
 case "${1:-status}" in
+  init)
+    [[ $CC_DB_MODE == private ]] || { echo "CC_DB_MODE=system: nothing to initialise"; exit 0; }
+    if [[ -d "$CC_DB_DATADIR/mysql" ]]; then echo "MariaDB data directory already exists"; exit 0; fi
+    mkdir -p "$CC_DB_DATADIR"
+    # The OS user running this becomes a passwordless admin over the socket.
+    mariadb-install-db --no-defaults --datadir="$CC_DB_DATADIR" \
+      --auth-root-authentication-method=socket --skip-test-db >"$CC_ROOT/data/mariadb-init.log" 2>&1 \
+      || { echo "mariadb-install-db failed, see data/mariadb-init.log" >&2; exit 1; }
+    echo "MariaDB data directory created in data/mariadb"
+    ;;
   start)
     if running; then echo "MariaDB already running"; exit 0; fi
-    sudo mkdir -p /run/mysqld && sudo chown mysql:mysql /run/mysqld
-    sudo mysqld_safe --user=mysql >/dev/null 2>&1 &
-    for _ in $(seq 50); do running && { echo "MariaDB started"; exit 0; }; sleep 0.2; done
-    echo "MariaDB failed to start; see /var/lib/mysql/*.err" >&2; exit 1
+    if [[ $CC_DB_MODE == private ]]; then
+      [[ -d "$CC_DB_DATADIR/mysql" ]] || { echo "no data/mariadb yet - run tools/setup.sh (or: $0 init)" >&2; exit 1; }
+      mkdir -p "$CC_ROOT/data/run"
+      mariadbd --no-defaults --datadir="$CC_DB_DATADIR" --port="$CC_DB_PORT" \
+        --bind-address=127.0.0.1 --socket="$sock" --pid-file="$CC_ROOT/data/run/mariadb.pid" \
+        --log-error="$CC_ROOT/data/run/mariadb.err" >/dev/null 2>&1 &
+      disown
+      wait_up && { echo "MariaDB started (port $CC_DB_PORT)"; exit 0; }
+      echo "MariaDB failed to start; see data/run/mariadb.err" >&2; exit 1
+    fi
+    if [[ -d /run/systemd/system ]]; then
+      sudo systemctl start mariadb
+    else
+      sudo mkdir -p /run/mysqld && sudo chown mysql:mysql /run/mysqld
+      sudo mysqld_safe --user=mysql >/dev/null 2>&1 &
+    fi
+    wait_up && { echo "MariaDB started"; exit 0; }
+    echo "MariaDB failed to start; see the system MariaDB log" >&2; exit 1
     ;;
   stop)
-    if running; then sudo mariadb-admin --socket="$sock" shutdown; echo "MariaDB stopped"
-    else echo "MariaDB not running"; fi
+    if ! running; then echo "MariaDB not running"; exit 0; fi
+    if [[ $CC_DB_MODE == private ]]; then
+      mariadb-admin --no-defaults --socket="$sock" shutdown
+    else
+      sudo mariadb-admin --socket="$sock" shutdown
+    fi
+    echo "MariaDB stopped"
     ;;
   status)
-    if running; then echo "MariaDB running"; else echo "MariaDB not running"; exit 1; fi
+    if running; then echo "MariaDB running ($CC_DB_MODE, port $CC_DB_PORT)"; else echo "MariaDB not running"; exit 1; fi
     ;;
-  *) echo "usage: $0 start|stop|status" >&2; exit 2 ;;
+  sql)
+    shift; admin "$@"
+    ;;
+  *) echo "usage: $0 start|stop|status|init|sql [args]" >&2; exit 2 ;;
 esac

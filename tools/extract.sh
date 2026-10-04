@@ -4,10 +4,10 @@
 set -euo pipefail
 
 client="${1:?usage: $0 <wow client dir>}"
-root="$(cd "$(dirname "$0")/.." && pwd)"
-ex="$root/build/vmangos-run/bin/Extractors"
-out="$root/data/server"
-threads="${THREADS:-20}"
+. "$(dirname "$0")/config.sh"
+ex="$CC_SERVER_DIR/bin/Extractors"
+out="$CC_ROOT/data/server"
+threads="${THREADS:-$CC_THREADS}"
 
 mkdir -p "$out" && cd "$out"
 t0=$SECONDS; step() { echo "== $1 ($(( SECONDS - t0 ))s elapsed)"; }

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Run the classiccraft VMaNGOS server (realmd :3725, mangosd :8086) in the background.
+# Run the classiccraft VMaNGOS server (realmd, mangosd; ports in tools/config.sh) in the background.
 # mangosd's console reads a named pipe, so GM commands can be sent from any shell.
 # Usage: tools/server.sh start|stop|status|cmd "<console command>"|log
 set -euo pipefail
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
-bin="$root/build/vmangos-run/bin"
-etc="$root/build/vmangos-run/etc"
+. "$(dirname "$0")/config.sh"
+root="$CC_ROOT"
+bin="$CC_SERVER_DIR/bin"
+etc="$CC_SERVER_DIR/etc"
 run="$root/data/run"
 pipe="$run/mangosd.in"
 mkdir -p "$run/logs"

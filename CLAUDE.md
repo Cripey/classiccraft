@@ -40,9 +40,9 @@ reference until classiccraft catches up.
 - `classiccraft/` — top-level git repo: our own code (Fabric mod, protocol, tools, docs).
 - `benilla/`, `vmangos/` — independent clones, gitignored by the top-level repo. Remotes:
   `origin` = our public GitHub forks (Cripey/benilla-classiccraft, Cripey/VMaNGOS-classiccraft),
-  `upstream` = original project. Our work lives on branch `classiccraft`; the fork's default branch
-  (`main` / `development`) stays an upstream mirror. Pull upstream fixes by hand when needed
-  (fork drift is accepted).
+  `upstream` = original project. Our work lives on the fork's default branch (benilla `main`,
+  VMaNGOS `development`), on top of upstream; pull upstream fixes by merging `upstream/<branch>`
+  when needed (fork drift is accepted).
 - `build/`, `data/` — gitignored: build outputs, extracted WoW data, DB dumps.
 
 ## Environment
@@ -68,6 +68,16 @@ reference until classiccraft catches up.
   `patch-2.MPQ` (9 MB); first suspect if benilla's visuals look off.
 
 ## Build / run
+- Player-facing setup (2026-10-04, README.md): `tools/setup.sh` (guided, resumable - steps marked in
+  `data/setup/`), `tools/update.sh`, `tools/build.sh [all|server|client|mod]`, `tools/db-setup.sh`
+  (create/import/migrations/custom rows/realm - idempotent), `tools/server-config.sh` (confs from
+  `.dist`; byte-identical to the hand-made ones), `tools/minecraft-install.sh` (Fabric installer
+  `-noprofile` + own launcher profile "classiccraft" with gameDir `<mc>/classiccraft`, Fabric API
+  from Modrinth, mod jar, `config/mcwow.json`). All read `tools/config.sh` (defaults: ports
+  3307/3725/8086, `CC_DB_MODE=private` = a user-owned MariaDB in `data/mariadb`, socket in
+  `$XDG_RUNTIME_DIR`) then `tools/local.env` (gitignored; entries `KEY="${KEY:-value}"` so env wins).
+  THIS machine: `CC_DB_MODE=system` in local.env (the distrobox MariaDB on 3307). `play.sh` uses
+  `distrobox-host-exec` only inside a container.
 - Day to day: `tools/db.sh start`, `tools/server.sh start|stop|status|log|cmd "<GM command>"`,
   `WOW_USER=player WOW_PASS=player tools/play.sh`. Accounts (GM 3): `player`/`player` for the user,
   `probe1`/`probe1` for scripted runs (char `Probeone`, human warrior). Unattended login test:
@@ -722,8 +732,11 @@ reference until classiccraft catches up.
    that pose and the WoW body followed (z 38 -> -1449). Now: `stream_cells` sends nothing while a
    cinematic plays (the mod keeps its cells), `bridge.rs` holds Placing during one and places
    afresh ("cinematic over") when it ends. OPEN: test.
-13. **Uncommitted**: everything since the fork commit policy (mod, protocol, tools, benilla
-   `classiccraft` branch, VMaNGOS `classiccraft` branch) is still uncommitted - wait for the user.
+13. **First push** (2026-10-04): all three repos committed and pushed under the Cripey account
+   (noreply 337582048+Cripey@users.noreply.github.com): Cripey/classiccraft `main`; the forks' work
+   rebased onto upstream's latest and pushed to their default branches (benilla `main`, VMaNGOS
+   `development`; both built clean first), the `classiccraft` branches deleted. Personal paths live in the gitignored `tools/local.env`. Further
+   commits/pushes still wait for the user.
 14. **Next** (2026-10-04 wrap-up; design in project memory `game-design`).
    - Test first (built, not yet confirmed live): 13v race intro (skip with ESC from Minecraft mode,
      no fall; also a full unskipped intro), 13u zone ores (copper in Elwynn, tin in Westfall, iron in
@@ -742,7 +755,6 @@ reference until classiccraft catches up.
    - Bows/crossbows item level (projectiles still use the character level); stable masters (farm
      animals); WoW tree chopping; MC mobs spawning in the dark on player bases (user: not now);
      the rest of the Elwynn slice polish (vendor prices, emerald rates, ore rates - tune by playtesting).
-   - Everything is still uncommitted (fork commit policy: wait for the user).
 
 ## What carries over from mcwow
 - Fabric mod (`azerothcore-mc/fabric/`): triangle collision (McwowTriCollider), block/entity
