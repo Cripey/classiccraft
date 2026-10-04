@@ -919,8 +919,9 @@ reference until classiccraft catches up.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
-  Further commits/pushes still wait for the user (memory `fork-commit-policy`); machine/person notes live in the
-  gitignored CLAUDE.local.md.
+  From now on (user, 2026-10-04): commit each logical change as it's done, small commits in whichever repo it touches,
+  push when a task is finished (memory `fork-commit-policy`); scrub personal data per commit; machine/person notes
+  live in the gitignored CLAUDE.local.md.
 - Built this session, live-test status in `docs/topics.md` (rows 1-31 = every topic discussed, decided or open):
   progression sim (15), 2x XP, copper in iron zones, ore veins + yield fix, herbs + brewing, limited vendor stock,
   armor classes (16), difficulty curve (20), hitboxes (21), WoW weapon models (22), tree chopping B (18), camera (23).
