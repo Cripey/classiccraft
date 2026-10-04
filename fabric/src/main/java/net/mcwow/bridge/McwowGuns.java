@@ -122,6 +122,13 @@ public final class McwowGuns {
         return null;
     }
 
+    /** The best ammo tier a character level allows. */
+    static Ammo bestTierFor(int level) {
+        Ammo best = AMMO.getFirst();
+        for (Ammo a : AMMO) if (a.req() <= Math.max(1, level)) best = a;
+        return best;
+    }
+
     /** The best ammo stack the player may use (highest tier at or under their WoW level), or EMPTY. */
     static ItemStack bestAmmo(Player player) {
         int level = Math.max(1, McwowGear.wowLevel());
@@ -171,8 +178,9 @@ public final class McwowGuns {
                         .withStyle(net.minecraft.ChatFormatting.RED));
                 return InteractionResult.FAIL;
             }
+            // Creative: the best ammo the character's level allows (not the top tier - 2026-10-04 test).
             ItemStack ammo = player.hasInfiniteMaterials() ? new ItemStack(BuiltInRegistries.ITEM.getValue(
-                    Identifier.fromNamespaceAndPath("mcwow", AMMO.getLast().id()))) : bestAmmo(player);
+                    Identifier.fromNamespaceAndPath("mcwow", bestTierFor(McwowGear.wowLevel()).id()))) : bestAmmo(player);
             Ammo tier = ammoOf(ammo);
             if (tier == null) {
                 if (!level.isClientSide()) player.sendOverlayMessage(Component.literal("No ammo you can use (shot: gunpowder + nuggets)")
@@ -256,6 +264,9 @@ public final class McwowGuns {
         protected void onHitEntity(EntityHitResult hit) {
             super.onHitEntity(hit);
             if (this.level() instanceof ServerLevel sl) {
+                // Every pellet counts: a hit's immunity frames would swallow the rest of the volley
+                // (2026-10-04 test: one blunderbuss pellet of six landed).
+                hit.getEntity().setInvulnerableTime(0);
                 hit.getEntity().hurtServer(sl, this.damageSources().mobProjectile(this,
                         this.getOwner() instanceof LivingEntity le ? le : null), this.damage);
             }
