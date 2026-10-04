@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * Guns are aimed, not carried (user, 2026-10-04: in third person Steve pointed the rifle at the
  * ground, his arm as with a sword): a rifle or blunderbuss in hand takes Minecraft's loaded-crossbow
- * pose, both arms forward. Its third-person model points the barrel down the arm
+ * pose, both arms forward. Its third-person model runs the barrel along the arm
  * (gen_mod_data.py GUN_DISPLAY), which is forward in this pose. A swing keeps vanilla's pose.
  */
 @Mixin(AvatarRenderer.class)
