@@ -1,0 +1,12 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "mcwow:item/herb/mountain_silversage",
+    "tints": [
+      {
+        "type": "minecraft:constant",
+        "value": -3090208
+      }
+    ]
+  }
+}

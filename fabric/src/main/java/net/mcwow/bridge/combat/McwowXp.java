@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Minecraft's own XP bar is the WoW level (user, 2026-10-02): mirrorLevel sets it from the WoW
  * character every tick, so vanilla XP (ore, smelting, mobs, bottles) gives nothing and an enchanting
- * table or anvil, gated by it, can't lower it.
+ * table, gated by it, can't lower it. Anvils cost no levels in WoW dimensions (AnvilMenuMixin).
  */
 public final class McwowXp {
     private static final Logger LOGGER = LoggerFactory.getLogger("mcwow-bridge");

@@ -76,6 +76,9 @@ typedef struct McwowRenderHeader {
 #define MCWOW_REN_DIALOG 19u       // classiccraft: u64 npc, u8 kind, u8 action, u16 0, u32 arg - a choice in a
                                    // WoW NPC window (benilla external_dialog::DialogIn)
                                    // near the player, for their WoW server proxies (5 Hz)
+#define MCWOW_REN_RESPAWN 20u      // classiccraft: u32 kind (0 hearthstone location, 1 at), u32 map, f32 x, y, z, o
+#define MCWOW_REN_HARVEST 21u      // classiccraft: u64 the WoW ore vein mined with a Minecraft pickaxe (CMSG_CC_HARVEST)
+                                   // (WoW) - Steve respawned after a death (CMSG_CC_RESPAWN)
 
 #pragma pack(push, 1)
 typedef struct McwowRenMsgHeader { uint32_t type, payloadBytes; } McwowRenMsgHeader;

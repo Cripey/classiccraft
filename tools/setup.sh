@@ -38,7 +38,7 @@ echo
 distro="${ID:-unknown} ${ID_LIKE:-}"
 if [[ $distro == *debian* || $distro == *ubuntu* ]]; then
   pkgs=(git curl unzip build-essential cmake clang pkg-config libssl-dev zlib1g-dev libmariadb-dev
-        libmariadb-dev-compat libasound2-dev libudev-dev mariadb-server-core mariadb-client-core
+        libmariadb-dev-compat libasound2-dev libudev-dev mariadb-server-core mariadb-client-core mariadb-client
         openjdk-25-jdk ffmpeg python3)
   missing=(); for p in "${pkgs[@]}"; do dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "ok installed" || missing+=("$p"); done
   install=(sh -c "sudo apt-get update && sudo apt-get install -y ${missing[*]:-}")

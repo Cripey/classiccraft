@@ -20,11 +20,11 @@ public final class McwowActors {
     private static final String PATH = "/dev/shm/classiccraft_actors_v1.shm";
     // v2 (classiccraft): + the damage ring after the actors (protocol/mcwow_actors_protocol.h).
     // v3 (2026-10-03): + the text ring (system chat lines, GM command replies).
-    private static final int MAGIC = 0x6D637761, VERSION = 6, MAX = 64, ACTOR_BYTES = 72, HEADER_BYTES = 64;
-    private static final long RING_HEAD = HEADER_BYTES + (long) MAX * ACTOR_BYTES; // 4672
+    private static final int MAGIC = 0x6D637761, VERSION = 7, MAX = 64, ACTOR_BYTES = 80, HEADER_BYTES = 64;
+    private static final long RING_HEAD = HEADER_BYTES + (long) MAX * ACTOR_BYTES; // 5184
     private static final long RING_DATA = RING_HEAD + 8;
     private static final int RING_ENTRIES = 256, RING_ENTRY_BYTES = 32;
-    private static final long TEXT_HEAD = RING_DATA + (long) RING_ENTRIES * RING_ENTRY_BYTES; // 12872
+    private static final long TEXT_HEAD = RING_DATA + (long) RING_ENTRIES * RING_ENTRY_BYTES; // 13384
     private static final long TEXT_DATA = TEXT_HEAD + 8;
     private static final int TEXT_SLOTS = 64, TEXT_SLOT = 1024; // v4: NPC speech runs long
     // v5 (2026-10-03): the crosshair focus, what WoW thing a right-click would act on.
@@ -71,7 +71,7 @@ public final class McwowActors {
 
     public record Actor(long guid, float x, float y, float z, float facing, int entry, int displayId, float scale,
                         float boundingRadius, float combatReach, int health, int maxHealth, int level, long targetGuid,
-                        int flags, int unitFlags) {
+                        int flags, int unitFlags, float modelHeight, float modelWidth) {
         public boolean attackable() { return (flags & ATTACKABLE) != 0; }
         public boolean dead() { return (flags & DEAD) != 0; }
         /** A WoW critter / non-combat pet: never fights back (MCWOW_ACTOR_CRITTER). */
@@ -124,6 +124,20 @@ public final class McwowActors {
         KILLS.clear();
         return out;
     }
+    /** The WoW server's answer to a vein mined with a pickaxe (ring kind 0x12, McwowNodes). */
+    public record Harvested(long guid, int entry, boolean ok, boolean depleted, float x, float y, float z) {
+    }
+
+    private static final int HARVEST = 0x12;
+    private static final List<Harvested> HARVESTS = new ArrayList<>();
+
+    public static List<Harvested> drainHarvests() {
+        if (HARVESTS.isEmpty()) return List.of();
+        List<Harvested> out = new ArrayList<>(HARVESTS);
+        HARVESTS.clear();
+        return out;
+    }
+
     private static final List<XpDrop> XP_DROPS = new ArrayList<>();
 
     /** The XP drops the last drainDamage calls came across (server thread). */
@@ -138,8 +152,12 @@ public final class McwowActors {
      * A WoW hit on something Minecraft owns (the server's SMSG_CC_DAMAGE, relayed by benilla):
      * victimKind 0 = the player, 1 = the Minecraft mob {@code mcId}.
      */
-    public record Damage(int victimKind, int mcId, long attackerGuid, int wowDamage, int attackerLevel, int flags) {
+    public record Damage(int victimKind, int mcId, long attackerGuid, int wowDamage, int attackerLevel, int flags,
+                         int school) {
         public boolean crit() { return (flags & 1) != 0; }
+
+        /** A spell hit: any WoW school but physical (SpellSchoolMask, bit 0 = physical). */
+        public boolean spell() { return (school & ~1) != 0; }
     }
 
     private static MemorySegment shm;
@@ -202,6 +220,13 @@ public final class McwowActors {
                 }
                 continue;
             }
+            if (kind == HARVEST) {
+                if (HARVESTS.size() < RING_ENTRIES) {
+                    HARVESTS.add(new Harvested(s.get(L, o + 8), s.get(I, o + 4), s.get(ValueLayout.JAVA_BYTE, o + 1) != 0,
+                            s.get(ValueLayout.JAVA_BYTE, o + 2) != 0, s.get(F, o + 16), s.get(F, o + 20), s.get(F, o + 24)));
+                }
+                continue;
+            }
             if (kind == KILL) {
                 if (KILLS.size() < RING_ENTRIES) {
                     java.util.function.IntUnaryOperator b = k -> s.get(ValueLayout.JAVA_BYTE, o + k) & 0xFF;
@@ -212,7 +237,7 @@ public final class McwowActors {
                 continue;
             }
             out.add(new Damage(s.get(ValueLayout.JAVA_BYTE, o) & 0xFF, s.get(I, o + 4), s.get(L, o + 8),
-                    s.get(I, o + 16), s.get(I, o + 20), s.get(I, o + 24)));
+                    s.get(I, o + 16), s.get(I, o + 20), s.get(I, o + 24), s.get(I, o + 28)));
         }
         return out;
     }
@@ -249,7 +274,7 @@ public final class McwowActors {
                 out.add(new Actor(s.get(L, o), s.get(F, o + 8), s.get(F, o + 12), s.get(F, o + 16), s.get(F, o + 20),
                         s.get(I, o + 24), s.get(I, o + 28), s.get(F, o + 32), s.get(F, o + 36), s.get(F, o + 40),
                         s.get(I, o + 44), s.get(I, o + 48), s.get(I, o + 52), s.get(L, o + 56), s.get(I, o + 64),
-                        s.get(I, o + 68)));
+                        s.get(I, o + 68), s.get(F, o + 72), s.get(F, o + 76)));
             }
             VarHandle.acquireFence();
             if ((int) INT.getAcquire(s, 8L) == seq1) return me;

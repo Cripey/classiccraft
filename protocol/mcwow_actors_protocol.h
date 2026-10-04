@@ -15,7 +15,7 @@
 #define MCWOW_ACTORS_PATH_WIN "Z:\\dev\\shm\\mcwow_actors_v1.shm"
 #define MCWOW_ACTORS_PATH_UNIX "/dev/shm/classiccraft_actors_v1.shm"
 #define MCWOW_ACTORS_MAGIC 0x6D637761u // "mcwa"
-#define MCWOW_ACTORS_VERSION 5u // 2 (classiccraft): + the damage ring after actors[]; 3: + the text ring; 4: 1 KiB text slots;
+#define MCWOW_ACTORS_VERSION 7u // 7: + model size per actor; 6: self block; 2 (classiccraft): + the damage ring after actors[]; 3: + the text ring; 4: 1 KiB text slots;
                                 // 5: + the crosshair focus; 6: + our own state
 #define MCWOW_ACTORS_MAX 64u
 #define MCWOW_ACTORS_RANGE_YD 60.0f
@@ -43,7 +43,9 @@ typedef struct McwowActor {
     uint64_t targetGuid;    // 56 UNIT_FIELD_TARGET
     uint32_t flags;         // 64 MCWOW_ACTOR_*
     uint32_t unitFlags;     // 68 UNIT_FIELD_FLAGS
-} McwowActor; // 72 bytes
+    float modelHeight;      // 72 v7 (2026-10-04): the visible model's height (yd, idle box x scale; 0 = not loaded)
+    float modelWidth;       // 76 v7: ... and its larger flat extent (yd)
+} McwowActor; // 80 bytes
 
 typedef struct McwowActorsHeader {
     uint32_t magic;           // 0
@@ -96,13 +98,16 @@ typedef struct McwowActorDamage {
 //   f32 x, y, z (corpse, WoW yards), u8 beast family, u8 flags (1 = skinnable), u8 quest items the
 //   server put in the WoW bags, 5 bytes unused.
 #define MCWOW_ACTORS_KILL 0x11u
+// Ore veins (classiccraft, 2026-10-04): a WoW vein mined with a Minecraft pickaxe (SMSG_CC_HARVEST):
+//   u8 kind (0x12), u8 ok, u8 used up, u8 0, u32 GO entry, u64 vein guid, f32 x, y, z (WoW yards), 4 unused.
+#define MCWOW_ACTORS_HARVEST 0x12u
 #pragma pack(pop)
-#define MCWOW_ACTORS_RING_HEAD_OFF (64u + MCWOW_ACTORS_MAX * 72u) // 4672
+#define MCWOW_ACTORS_RING_HEAD_OFF (64u + MCWOW_ACTORS_MAX * 80u) // 5184
 #define MCWOW_ACTORS_RING_DATA_OFF (MCWOW_ACTORS_RING_HEAD_OFF + 8u)
 // The text ring (v3, 2026-10-03), after the damage ring: the server's system chat lines (GM command
 // replies, NPC speech) for Minecraft's chat. u64 head (benilla), then MCWOW_ACTORS_TEXT_SLOTS slots of 1024 bytes:
 // u16 length, UTF-8 (WoW's |c / |H codes left in; the mod strips them).
-#define MCWOW_ACTORS_TEXT_HEAD_OFF (MCWOW_ACTORS_RING_DATA_OFF + MCWOW_ACTORS_DAMAGE_SLOTS * 32u) // 12872
+#define MCWOW_ACTORS_TEXT_HEAD_OFF (MCWOW_ACTORS_RING_DATA_OFF + MCWOW_ACTORS_DAMAGE_SLOTS * 32u) // 13384
 #define MCWOW_ACTORS_TEXT_SLOTS 64u
 // The crosshair focus (v5, 2026-10-03), after the text ring: what WoW thing a right-click in Minecraft
 // would act on (benilla external::CrosshairTarget). u32 seq (odd while written), u32 kind (0 none,

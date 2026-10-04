@@ -235,6 +235,38 @@ public final class McwowGeomStore {
     }
 
     /**
+     * How far a ray (WORLD block coordinates, unit direction) runs before WoW's geometry - terrain,
+     * buildings, doodad hulls, transport decks (McwowDecks) - stops it; {@code max} when nothing
+     * does. Moller-Trumbore, both faces. For the third-person camera (client CameraZoomMixin).
+     */
+    public static double clip(double x, double y, double z, double dx, double dy, double dz, double max) {
+        double ox = x - regionOffsetX, oz = z - regionOffsetZ;
+        double ex = ox + dx * max, ey = y + dy * max, ez = oz + dz * max;
+        java.util.List<Tri> tris = new java.util.ArrayList<>(near((float) Math.min(ox, ex), (float) Math.min(y, ey),
+                (float) Math.min(oz, ez), (float) Math.max(ox, ex), (float) Math.max(y, ey), (float) Math.max(oz, ez)));
+        tris.addAll(McwowDecks.near(Math.min(ox, ex), Math.min(y, ey), Math.min(oz, ez), Math.max(ox, ex),
+                Math.max(y, ey), Math.max(oz, ez)));
+        double best = max;
+        for (Tri t : tris) {
+            double e1x = t.x1 - t.x0, e1y = t.y1 - t.y0, e1z = t.z1 - t.z0;
+            double e2x = t.x2 - t.x0, e2y = t.y2 - t.y0, e2z = t.z2 - t.z0;
+            double px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
+            double det = e1x * px + e1y * py + e1z * pz;
+            if (Math.abs(det) < 1e-12) continue;
+            double inv = 1.0 / det;
+            double sx = ox - t.x0, sy = y - t.y0, sz = oz - t.z0;
+            double u = (sx * px + sy * py + sz * pz) * inv;
+            if (u < 0 || u > 1) continue;
+            double qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+            double v = (dx * qx + dy * qy + dz * qz) * inv;
+            if (v < 0 || u + v > 1) continue;
+            double d = (e2x * qx + e2y * qy + e2z * qz) * inv;
+            if (d > 1e-4 && d < best) best = d;
+        }
+        return best;
+    }
+
+    /**
      * All triangles whose bounding box overlaps the given MC-block-space (region-local) box, each
      * once. Visits only the index buckets under the box.
      */

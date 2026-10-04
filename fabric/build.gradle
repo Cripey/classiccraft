@@ -31,6 +31,17 @@ loom {
 			runDir "build/datacheck"
 			programArgs "--nogui" // run with -Pdatacheck, else the (client) mod isn't loaded
 		}
+		// The progression sim's rules export (tools/progression.sh): a headless server that evaluates
+		// the mod's rules into JSON (McwowSimExport) and stops. -PsimIn=<wow.json> -PsimOut=<rules.json>.
+		sim {
+			server()
+			name "Progression sim export"
+			runDir "build/sim-server"
+			programArgs "--nogui"
+			if (project.hasProperty("simIn")) {
+				vmArgs "-Dmcwow.sim.in=${project.property('simIn')}", "-Dmcwow.sim.out=${project.property('simOut')}"
+			}
+		}
 	}
 
 	mods {
@@ -54,7 +65,7 @@ dependencies {
 processResources {
 	def version = project.version
 	// -Pdatacheck: the mod also loads on a dedicated server (runDatacheck only; it's a client mod).
-	def environment = project.hasProperty("datacheck") ? "*" : "client"
+	def environment = project.hasProperty("datacheck") || project.hasProperty("simIn") ? "*" : "client"
 	inputs.property "version", version
 	inputs.property "environment", environment
 	filesMatching("fabric.mod.json") {

@@ -9,9 +9,16 @@ set -euo pipefail
 cd "$CC_ROOT"
 
 mc="${CC_MC_DIR:-}"
+flatpak_dir="$HOME/.var/app/com.mojang.Minecraft/.minecraft"
 if [[ -z $mc ]]; then
-  for d in "$HOME/.minecraft" "$HOME/.var/app/com.mojang.Minecraft/.minecraft"; do
-    [[ -f $d/launcher_profiles.json ]] && { mc=$d; break; }
+  # Both the native and the Flatpak launcher may have left a folder; the one used most recently
+  # (newest profile list) is the launcher in use.
+  newest=0
+  for d in "$HOME/.minecraft" "$flatpak_dir"; do
+    f=$d/launcher_profiles.json
+    [[ -f $f ]] || continue
+    t=$(stat -c %Y "$f")
+    (( t > newest )) && { newest=$t; mc=$d; }
   done
 fi
 if [[ -z $mc || ! -f $mc/launcher_profiles.json ]]; then
@@ -30,6 +37,9 @@ game="$mc/classiccraft"
 version_id="fabric-loader-$loader-$mcv"
 
 echo "Minecraft directory: $mc"
+for d in "$HOME/.minecraft" "$flatpak_dir"; do
+  [[ $d != "$mc" && -f $d/launcher_profiles.json ]] && echo "(Another launcher folder exists: $d. Wrong one? Rerun with CC_MC_DIR=$d)"
+done
 if [[ ! -d $mc/versions/$version_id ]]; then
   echo "Installing Fabric Loader $loader for Minecraft $mcv..."
   url=$(curl -fsSL https://meta.fabricmc.net/v2/versions/installer | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["url"])')
@@ -79,3 +89,7 @@ cat >"$game/config/mcwow.json" <<EOF
 EOF
 
 echo "Done. In the Minecraft launcher, pick the \"classiccraft\" profile and press Play."
+if [[ $mc == "$flatpak_dir" ]]; then
+  echo "Flatpak launcher: Minecraft must see the shared /dev/shm to talk to WoW. Once, in a host terminal:"
+  echo "  flatpak override --user --device=shm com.mojang.Minecraft"
+fi

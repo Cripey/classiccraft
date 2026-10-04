@@ -34,7 +34,10 @@
     "TextureManagerAccessor",
     "LightmapExtractorMixin",
     "DefaultPlayerSkinMixin",
-    "LevelLoadReadyMixin"
+    "LevelLoadReadyMixin",
+    "AnvilScreenMixin",
+    "CameraZoomMixin",
+    "PackRepositoryMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

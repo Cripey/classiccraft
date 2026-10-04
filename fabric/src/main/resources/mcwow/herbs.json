@@ -1,0 +1,114 @@
+{
+  "Peacebloom": {
+    "id": "peacebloom",
+    "item": "minecraft:glistering_melon_slice"
+  },
+  "Silverleaf": {
+    "id": "silverleaf",
+    "item": "minecraft:nether_wart"
+  },
+  "Earthroot": {
+    "id": "earthroot",
+    "item": "minecraft:blaze_powder"
+  },
+  "Mageroyal": {
+    "id": "mageroyal",
+    "item": "minecraft:sugar"
+  },
+  "Briarthorn": {
+    "id": "briarthorn",
+    "item": "minecraft:spider_eye"
+  },
+  "Stranglekelp": {
+    "id": "stranglekelp",
+    "item": "minecraft:pufferfish"
+  },
+  "Bruiseweed": {
+    "id": "bruiseweed",
+    "item": "minecraft:rabbit_foot"
+  },
+  "Wild Steelbloom": {
+    "id": "wild_steelbloom",
+    "item": "minecraft:rabbit_foot"
+  },
+  "Grave Moss": {
+    "id": "grave_moss",
+    "item": "minecraft:fermented_spider_eye"
+  },
+  "Kingsblood": {
+    "id": "kingsblood",
+    "item": "minecraft:glistering_melon_slice"
+  },
+  "Liferoot": {
+    "id": "liferoot",
+    "item": "minecraft:ghast_tear"
+  },
+  "Fadeleaf": {
+    "id": "fadeleaf",
+    "item": "minecraft:golden_carrot"
+  },
+  "Goldthorn": {
+    "id": "goldthorn",
+    "item": "minecraft:glowstone_dust"
+  },
+  "Khadgar's Whisker": {
+    "id": "khadgars_whisker",
+    "item": "minecraft:redstone"
+  },
+  "Wintersbite": {
+    "id": "wintersbite",
+    "item": "minecraft:phantom_membrane"
+  },
+  "Firebloom": {
+    "id": "firebloom",
+    "item": "minecraft:magma_cream"
+  },
+  "Purple Lotus": {
+    "id": "purple_lotus",
+    "item": "minecraft:glowstone_dust"
+  },
+  "Arthas' Tears": {
+    "id": "arthas_tears",
+    "item": "minecraft:ghast_tear"
+  },
+  "Sungrass": {
+    "id": "sungrass",
+    "item": "minecraft:blaze_powder"
+  },
+  "Blindweed": {
+    "id": "blindweed",
+    "item": "minecraft:spider_eye"
+  },
+  "Ghost Mushroom": {
+    "id": "ghost_mushroom",
+    "item": "minecraft:fermented_spider_eye"
+  },
+  "Gromsblood": {
+    "id": "gromsblood",
+    "item": "minecraft:blaze_powder"
+  },
+  "Golden Sansam": {
+    "id": "golden_sansam",
+    "item": "minecraft:glistering_melon_slice"
+  },
+  "Dreamfoil": {
+    "id": "dreamfoil",
+    "item": "minecraft:phantom_membrane"
+  },
+  "Mountain Silversage": {
+    "id": "mountain_silversage",
+    "item": "minecraft:ghast_tear"
+  },
+  "Plaguebloom": {
+    "id": "plaguebloom",
+    "item": "minecraft:fermented_spider_eye"
+  },
+  "Icecap": {
+    "id": "icecap",
+    "item": "minecraft:breeze_rod"
+  },
+  "Black Lotus": {
+    "id": "black_lotus",
+    "item": "minecraft:dragon_breath"
+  }
+}

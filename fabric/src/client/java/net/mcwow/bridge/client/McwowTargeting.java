@@ -84,7 +84,10 @@ public final class McwowTargeting {
         }
         HitResult result = vanilla;
         boolean wowTarget = false;
-        if (bestT < vanillaDist) {
+        BlockHitResult skirt = skirtHit(mc, eye, dir, Math.min(range, Math.min(bestT, vanillaDist)));
+        if (skirt != null) {
+            mc.hitResult = result = skirt;
+        } else if (bestT < vanillaDist) {
             // Normal turned towards the player, snapped to its dominant axis.
             if (bnx * dir.x + bny * dir.y + bnz * dir.z > 0) { bnx = -bnx; bny = -bny; bnz = -bnz; }
             Direction face = Direction.getApproximateNearest(bnx, bny, bnz);
@@ -103,6 +106,72 @@ public final class McwowTargeting {
             mc.hitResult = result;
         }
         publishSelection(mc, result, wowTarget);
+    }
+
+    /**
+     * A hole wall (McwowWorldExporter.addSkirts) in front of everything else within limit: the ray
+     * crosses from an open column into a closed one between the closed column's top block and the
+     * WoW ground over it. The wall stands for that column's ground, so the target is its top block
+     * (breaking it opens the column, as an upward hit on WoW's ground does). The walls are drawn
+     * only - without this the ray went through into the gap and broke the block behind (2026-10-04).
+     */
+    private static BlockHitResult skirtHit(Minecraft mc, Vec3 eye, Vec3 dir, double limit) {
+        Skirt s = skirt(mc.level, eye, dir, limit);
+        if (s == null) return null;
+        // The hit point on the top block's own face (the server wants it inside that block).
+        return new BlockHitResult(new Vec3(s.hit().x, s.top() + 0.999, s.hit().z), s.face(),
+                new BlockPos(s.cx(), s.top(), s.cz()), false);
+    }
+
+    /** How far a ray runs before a hole wall stops it; {@code limit} when none does (CameraZoomMixin). */
+    public static double skirtDistance(net.minecraft.world.level.Level level, Vec3 from, Vec3 dir, double limit) {
+        Skirt s = skirt(level, from, dir, limit);
+        return s == null ? limit : s.t();
+    }
+
+    /** A hole wall the ray meets: where along it, the closed column (its top block) and the side crossed. */
+    private record Skirt(double t, Vec3 hit, int cx, int cz, int top, Direction face) {
+    }
+
+    private static Skirt skirt(net.minecraft.world.level.Level level, Vec3 eye, Vec3 dir, double limit) {
+        int cx = net.minecraft.util.Mth.floor(eye.x), cz = net.minecraft.util.Mth.floor(eye.z);
+        int stepX = dir.x > 0 ? 1 : -1, stepZ = dir.z > 0 ? 1 : -1;
+        double tDeltaX = dir.x == 0 ? Double.MAX_VALUE : Math.abs(1.0 / dir.x);
+        double tDeltaZ = dir.z == 0 ? Double.MAX_VALUE : Math.abs(1.0 / dir.z);
+        double tMaxX = dir.x == 0 ? Double.MAX_VALUE : ((stepX > 0 ? cx + 1 - eye.x : eye.x - cx) * tDeltaX);
+        double tMaxZ = dir.z == 0 ? Double.MAX_VALUE : ((stepZ > 0 ? cz + 1 - eye.z : eye.z - cz) * tDeltaZ);
+        boolean curOpen = net.mcwow.bridge.McwowColumns.isOpen(level, cx, cz);
+        for (int i = 0; i < 16; ++i) {
+            double t;
+            Direction face; // the crossed side of the next column, facing back at the player
+            if (tMaxX < tMaxZ) {
+                t = tMaxX;
+                tMaxX += tDeltaX;
+                cx += stepX;
+                face = stepX > 0 ? Direction.WEST : Direction.EAST;
+            } else {
+                t = tMaxZ;
+                tMaxZ += tDeltaZ;
+                cz += stepZ;
+                face = stepZ > 0 ? Direction.NORTH : Direction.SOUTH;
+            }
+            if (t > limit) return null;
+            int top = net.mcwow.bridge.McwowColumns.topOf(level, cx, cz);
+            boolean open = net.mcwow.bridge.McwowColumns.isOpen(level, top, cx, cz, new BlockPos.MutableBlockPos());
+            if (curOpen && !open && top != net.mcwow.bridge.McwowTerrainFill.NO_TOP) {
+                Vec3 hit = eye.add(dir.scale(t));
+                int y0 = top + 1;
+                if (hit.y >= y0 && hit.y <= y0 + 8.0) {
+                    // The WoW ground over the closed column's gap cell, sampled just inside it (as the wall is).
+                    double ground = net.mcwow.bridge.McwowTriHeight.lowestSurface(
+                            hit.x - face.getStepX() * 0.002 - McwowGeomStore.regionOffsetX,
+                            hit.z - face.getStepZ() * 0.002 - McwowGeomStore.regionOffsetZ, y0 - 0.05, y0 + 9.0);
+                    if (!Double.isNaN(ground) && hit.y <= ground) return new Skirt(t, hit, cx, cz, top, face);
+                }
+            }
+            curOpen = open;
+        }
+        return null;
     }
 
     /**

@@ -19,18 +19,22 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.DyedItemColor;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.enchantment.Repairable;
 
 /**
  * Levelled gear (2026-10-03). Every piece of armor, tool and weapon has a WoW item level and a
  * required level, set by the material it was made of (user: the look follows the material):
- * leathers light..rugged (leather armor, dyed darker per tier), copper (copper), bronze (golden
+ * leathers light..rugged (leather armor, dyed darker per tier), cloths linen..runecloth (leather
+ * armor dyed light colours), copper (copper), bronze (golden
  * look), iron and steel (iron), mithril (chainmail armor, iron tools), thorium (diamond), dark iron
  * (netherite), plus vanilla's wood, stone and gold. Crafting stamps the result (ShapedRecipeMixin)
  * with the `mcwow:gear` component, the material's name, durability and repair material, and the
@@ -58,8 +62,16 @@ public final class McwowGear {
      * a leather dye (-1 none).
      */
     public record Material(String id, String title, int ilvl, int req, String armorTwin, String toolTwin,
-                           float durability, String repair, int dye) {
+                           float durability, String repair, int dye, String armorClass) {
     }
+
+    /**
+     * Armor classes (user, 2026-10-04): a piece's base points come from its tier (the armor twin);
+     * its class splits them into physical protection (Minecraft's armor attribute) and spell
+     * protection (WoW spell hits - McwowCombat). Metal 100% / 40%, leather 70 / 70, cloth 40 / 100.
+     */
+    public static final Map<String, float[]> CLASS_WEIGHTS = Map.of("metal", new float[] {1.0F, 0.4F},
+            "leather", new float[] {0.7F, 0.7F}, "cloth", new float[] {0.4F, 1.0F});
 
     private static final Map<String, Material> MATERIALS = new HashMap<>();
     /** Grid ingredient -> material. */
@@ -73,6 +85,8 @@ public final class McwowGear {
     private static final List<String> ARMOR = List.of("helmet", "chestplate", "leggings", "boots");
     private static final Map<String, String> LEATHER_NAMES = Map.of("helmet", "Cap", "chestplate", "Tunic",
             "leggings", "Pants", "boots", "Boots");
+    private static final Map<String, String> CLOTH_NAMES = Map.of("helmet", "Hood", "chestplate", "Robe",
+            "leggings", "Pants", "boots", "Boots");
 
     public static DataComponentType<Gear> GEAR;
 
@@ -81,7 +95,8 @@ public final class McwowGear {
 
     private static void material(String id, String title, int ilvl, int req, String armorTwin, String toolTwin,
                                  float durability, String repair, int dye) {
-        MATERIALS.put(id, new Material(id, title, ilvl, req, armorTwin, toolTwin, durability, repair, dye));
+        String cls = armorTwin == null ? null : dye < 0 ? "metal" : repair.endsWith("leather") ? "leather" : "cloth";
+        MATERIALS.put(id, new Material(id, title, ilvl, req, armorTwin, toolTwin, durability, repair, dye, cls));
     }
 
     static {
@@ -95,11 +110,18 @@ public final class McwowGear {
         material("mithril", "Mithril", 43, 38, "diamond", "diamond", 0.5F, "mcwow:mithril_bar", -1);
         material("thorium", "Thorium", 54, 50, "diamond", "diamond", 1.0F, "mcwow:thorium_bar", -1);
         material("dark_iron", "Dark Iron", 60, 55, "netherite", "netherite", 1.0F, "mcwow:dark_iron_bar", -1);
-        material("light_leather", "Light Leather", 8, 5, "leather", null, 1.0F, "mcwow:light_leather", 0xC8A070);
-        material("medium_leather", "Medium Leather", 20, 16, "leather", null, 1.4F, "mcwow:medium_leather", 0xA07848);
-        material("heavy_leather", "Heavy Leather", 30, 26, "copper", null, 1.0F, "mcwow:heavy_leather", 0x7A5434);
-        material("thick_leather", "Thick Leather", 42, 38, "chainmail", null, 1.0F, "mcwow:thick_leather", 0x5E4030);
-        material("rugged_leather", "Rugged Leather", 54, 50, "iron", null, 1.4F, "mcwow:rugged_leather", 0x463228);
+        // Leather and cloth take their tier's base points (the metal twin of their band); the class
+        // weights split them (CLASS_WEIGHTS). Dyes: leather browns, cloth light colours.
+        material("light_leather", "Light Leather", 8, 5, "copper", null, 1.0F, "mcwow:light_leather", 0xC8A070);
+        material("medium_leather", "Medium Leather", 20, 16, "iron", null, 1.0F, "mcwow:medium_leather", 0xA07848);
+        material("heavy_leather", "Heavy Leather", 30, 26, "iron", null, 1.0F, "mcwow:heavy_leather", 0x7A5434);
+        material("thick_leather", "Thick Leather", 42, 38, "diamond", null, 1.0F, "mcwow:thick_leather", 0x5E4030);
+        material("rugged_leather", "Rugged Leather", 54, 50, "diamond", null, 1.0F, "mcwow:rugged_leather", 0x463228);
+        material("linen_cloth", "Linen", 8, 5, "copper", null, 1.0F, "mcwow:linen_cloth", 0xF2EEE2);
+        material("wool_cloth", "Wool", 18, 14, "iron", null, 1.0F, "mcwow:wool_cloth", 0xC8D4E8);
+        material("silk_cloth", "Silk", 28, 24, "iron", null, 1.0F, "mcwow:silk_cloth", 0xE8C8F0);
+        material("mageweave_cloth", "Mageweave", 42, 38, "diamond", null, 1.0F, "mcwow:mageweave_cloth", 0xB8A8F0);
+        material("runecloth", "Runecloth", 54, 50, "diamond", null, 1.0F, "mcwow:runecloth", 0x98D8E8);
     }
 
     private static Item item(String id) {
@@ -117,6 +139,7 @@ public final class McwowGear {
             BY_INGREDIENT.put(item("mcwow:" + m + "_bar"), m);
         }
         for (String l : McwowOres.LEATHERS) BY_INGREDIENT.put(item("mcwow:" + l), l);
+        for (String c : McwowOres.CLOTHS) BY_INGREDIENT.put(item("mcwow:" + c), c);
         // A weapon (or tool) above the character's level can't attack (user, 2026-10-03: hitting
         // as level 1 still let it be used).
         net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
@@ -168,6 +191,11 @@ public final class McwowGear {
         return MATERIALS.get(id);
     }
 
+    /** Every material (the progression sim's export). */
+    public static java.util.Collection<Material> materials() {
+        return MATERIALS.values();
+    }
+
     /** ShapedRecipeMixin: a crafted piece takes the material that lay in the grid. */
     public static void stampCrafted(ItemStack result, CraftingInput input) {
         String piece = piece(result.getItem());
@@ -194,6 +222,11 @@ public final class McwowGear {
             if (c.has(DataComponents.TOOL)) stack.set(DataComponents.TOOL, c.get(DataComponents.TOOL));
             if (c.has(DataComponents.WEAPON)) stack.set(DataComponents.WEAPON, c.get(DataComponents.WEAPON));
         }
+        if (armor && m.armorClass() != null) {
+            float physical = CLASS_WEIGHTS.get(m.armorClass())[0];
+            if (physical != 1.0F) stack.set(DataComponents.ATTRIBUTE_MODIFIERS, scaledArmor(
+                    stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY), physical));
+        }
         Item durabilityOf = twin != null && twin != Items.AIR ? twin : stack.getItem();
         Integer max = durabilityOf.components().get(DataComponents.MAX_DAMAGE);
         if (max != null) stack.set(DataComponents.MAX_DAMAGE, Math.max(1, Math.round(max * m.durability())));
@@ -203,11 +236,76 @@ public final class McwowGear {
         if (m.dye() >= 0) stack.set(DataComponents.DYED_COLOR, new DyedItemColor(m.dye()));
         if (!List.of("wood", "stone", "copper", "gold", "iron").contains(m.id())) {
             // "Bronze Chestplate"; leathers as vanilla names leather armor: "Heavy Leather Tunic".
-            String name = m.dye() >= 0 ? LEATHER_NAMES.getOrDefault(piece, piece)
+            String name = "cloth".equals(m.armorClass()) ? CLOTH_NAMES.getOrDefault(piece, piece)
+                    : m.dye() >= 0 ? LEATHER_NAMES.getOrDefault(piece, piece)
                     : Character.toUpperCase(piece.charAt(0)) + piece.substring(1);
             stack.set(DataComponents.ITEM_NAME, Component.literal(m.title() + " " + name));
         }
         stack.set(GEAR, new Gear(m.id(), m.ilvl(), m.req()));
+    }
+
+    /** Armor and toughness modifiers times a factor (the class's physical share). */
+    private static ItemAttributeModifiers scaledArmor(ItemAttributeModifiers mods, float factor) {
+        List<ItemAttributeModifiers.Entry> out = new java.util.ArrayList<>();
+        for (ItemAttributeModifiers.Entry e : mods.modifiers()) {
+            if (e.attribute().equals(Attributes.ARMOR) || e.attribute().equals(Attributes.ARMOR_TOUGHNESS)) {
+                AttributeModifier m = e.modifier();
+                e = new ItemAttributeModifiers.Entry(e.attribute(),
+                        new AttributeModifier(m.id(), m.amount() * factor, m.operation()), e.slot(), e.display());
+            }
+            out.add(e);
+        }
+        return new ItemAttributeModifiers(out);
+    }
+
+    /** The armor slot a piece name goes in. */
+    private static EquipmentSlot slotOf(String piece) {
+        return switch (piece) {
+            case "helmet" -> EquipmentSlot.HEAD;
+            case "chestplate" -> EquipmentSlot.CHEST;
+            case "leggings" -> EquipmentSlot.LEGS;
+            default -> EquipmentSlot.FEET;
+        };
+    }
+
+    /** The armor class of a worn piece (null: not armor gear). */
+    public static String armorClass(ItemStack stack) {
+        Gear g = of(stack);
+        String piece = piece(stack.getItem());
+        if (g == null || piece == null || !ARMOR.contains(piece)) return null;
+        Material m = MATERIALS.get(g.material());
+        return m == null ? null : m.armorClass();
+    }
+
+    /**
+     * A piece's spell protection {armor, toughness}: its tier's base points (the twin's own armor
+     * attribute) times its class's spell share. Zero for anything that isn't armor gear.
+     */
+    public static float[] spellProtection(ItemStack stack) {
+        Gear g = of(stack);
+        String piece = piece(stack.getItem());
+        if (g == null || piece == null || !ARMOR.contains(piece)) return new float[2];
+        Material m = MATERIALS.get(g.material());
+        if (m == null || m.armorClass() == null) return new float[2];
+        Item twin = item("minecraft:" + m.armorTwin() + "_" + piece);
+        if (twin == Items.AIR) return new float[2];
+        ItemAttributeModifiers mods = twin.components().getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);
+        EquipmentSlot slot = slotOf(piece);
+        float spell = CLASS_WEIGHTS.get(m.armorClass())[1];
+        return new float[] {(float) mods.compute(Attributes.ARMOR, 0.0, slot) * spell,
+                (float) mods.compute(Attributes.ARMOR_TOUGHNESS, 0.0, slot) * spell};
+    }
+
+    /** The player's spell protection {armor, toughness} over the four armor slots. */
+    public static float[] spellProtection(Player player) {
+        float[] sum = new float[2];
+        for (EquipmentSlot slot : new EquipmentSlot[] {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS,
+                EquipmentSlot.FEET}) {
+            float[] p = spellProtection(player.getItemBySlot(slot));
+            sum[0] += p[0];
+            sum[1] += p[1];
+        }
+        return sum;
     }
 
     // ---- the WoW level and what it allows ------------------------------------------------------
@@ -255,6 +353,11 @@ public final class McwowGear {
      * level below, within 0.5x..2x. Naked against a level-10 wolf: 1.5x; full light leather (8): 1.1x.
      */
     public static float armorFactor(Player player, int attackerLevel) {
-        return Math.clamp(1.0F + 0.05F * (attackerLevel - armorLevel(player)), 0.5F, 2.0F);
+        return armorFactor(armorLevel(player), attackerLevel);
+    }
+
+    /** The same from the armor's average item level. */
+    public static float armorFactor(float armorLevel, int attackerLevel) {
+        return Math.clamp(1.0F + 0.05F * (attackerLevel - armorLevel), 0.5F, 2.0F);
     }
 }

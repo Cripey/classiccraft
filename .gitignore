@@ -8,3 +8,5 @@
 # Machine-specific settings (paths on this computer)
 /tools/local.env
 __pycache__/
+# Machine- and person-specific notes for Claude Code (loaded with CLAUDE.md, never pushed)
+/CLAUDE.local.md

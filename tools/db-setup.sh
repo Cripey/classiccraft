@@ -38,12 +38,22 @@ for a in json.load(sys.stdin)["assets"]:
   unzip -oq "data/db/${url##*/}" -d data/db
 fi
 
-tables() { sql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$1'"; }
+# An import cut short (Ctrl+C, crash) leaves a "db-importing-<db>" marker; the next run drops that
+# half-filled database and imports it again. Databases this script didn't start importing (e.g. an
+# install set up by hand) are never touched.
+mkdir -p data/setup
 declare -A file=([mangos]=mangos [characters]=characters [realmd]=logon [logs]=logs)
 for d in "${dbs[@]}"; do
-  if [[ $(tables "$d") == 0 ]]; then
+  busy="data/setup/db-importing-$d"
+  if [[ -f $busy ]]; then
+    echo "Redoing the import of $d (the last one didn't finish)..."
+    sql -e "DROP DATABASE IF EXISTS \`$d\`; CREATE DATABASE \`$d\` CHARACTER SET utf8mb4;"
+  fi
+  if [[ $(sql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$d'") == 0 ]]; then
     echo "Importing $d ($(du -h "$dump/${file[$d]}.sql" | cut -f1))..."
+    date > "$busy"
     sql "$d" < "$dump/${file[$d]}.sql"
+    rm -f "$busy"
   fi
 done
 

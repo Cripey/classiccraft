@@ -52,7 +52,7 @@ public final class McwowTerrainFill {
     /** Blocks of ground under the top block; bedrock below. */
     public static final int DEPTH = 48;
     /** Deepslate from this far under the top block. */
-    private static final int DEEPSLATE_DEPTH = 24;
+    static final int DEEPSLATE_DEPTH = 24;
     /** The top block's top stays at least this far under the WoW surface. */
     private static final float SURFACE_GAP = 0.05F;
     /** A column whose fill was lowered this far under the surface is under a structure: rock only. */

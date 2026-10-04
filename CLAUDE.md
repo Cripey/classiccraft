@@ -48,7 +48,7 @@ reference until classiccraft catches up.
 ## Environment
 - Claude Code runs inside an Ubuntu 26.04 distrobox (see mcwow's CLAUDE.md "Environment"):
   `apt` with passwordless sudo, OpenJDK 25, `/dev/shm` shared with the host, `DISPLAY=:1`.
-  Host GPU: RTX 5070 Ti, NVIDIA driver 610.57.04, i9-12900K (24 threads), 31 GB RAM.
+  Host hardware: `CLAUDE.local.md`.
 - Everything runs inside the distrobox (no Docker). Installed 2026-10-02: rustup (`~/.cargo`;
   benilla pins its toolchain in `rust-toolchain.toml`), build-essential, cmake, clang, pkg-config,
   ALSA/udev/OpenSSL/zlib dev packages, MariaDB 11.8 server + `libmariadb-dev`.
@@ -64,7 +64,7 @@ reference until classiccraft catches up.
   (verified 2026-10-02: login, char create, world entry). Build in the box, run on the host.
   On Wayland, winit logs "could not set cursor position" — watch mouselook.
 - 1.12.1 client (5875 enUS, verified): path in `WOW_CLIENT` (set in the gitignored `tools/local.env`,
-  read by `tools/play.sh` / `tools/minecraft.sh`) — NTFS/OneDrive, **read only, never write into it**. Has a non-stock
+  read by `tools/play.sh` / `tools/minecraft.sh`) — **read only, never write into it**. Has a non-stock
   `patch-2.MPQ` (9 MB); first suspect if benilla's visuals look off.
 
 ## Build / run
@@ -76,12 +76,12 @@ reference until classiccraft catches up.
   from Modrinth, mod jar, `config/mcwow.json`). All read `tools/config.sh` (defaults: ports
   3307/3725/8086, `CC_DB_MODE=private` = a user-owned MariaDB in `data/mariadb`, socket in
   `$XDG_RUNTIME_DIR`) then `tools/local.env` (gitignored; entries `KEY="${KEY:-value}"` so env wins).
-  THIS machine: `CC_DB_MODE=system` in local.env (the distrobox MariaDB on 3307). `play.sh` uses
-  `distrobox-host-exec` only inside a container.
+  This machine's choices: `CLAUDE.local.md`. `play.sh` uses `distrobox-host-exec` only inside a container.
+- Progression check (after balance changes): `tools/progression.sh` (plan step 15). Design topics
+  discussed with the user and their status: `docs/topics.md` - keep it updated.
 - Day to day: `tools/db.sh start`, `tools/server.sh start|stop|status|log|cmd "<GM command>"`,
-  `WOW_USER=player WOW_PASS=player tools/play.sh`. Accounts (GM 3): `player`/`player` for the user,
-  `probe1`/`probe1` for scripted runs (char `Probeone`, human warrior). Unattended login test:
-  `WOW_USER=probe1 WOW_PASS=probe1 WOW_CHAR=Probeone WOW_UNATTENDED=1 WOW_NOSOUND=1
+  `WOW_USER=<account> WOW_PASS=<password> tools/play.sh` (this machine's accounts: `CLAUDE.local.md`).
+  Unattended login test: `WOW_USER=.. WOW_PASS=.. WOW_CHAR=.. WOW_UNATTENDED=1 WOW_NOSOUND=1
   WOW_PROBE_EXIT_AT=40 tools/play.sh` (switches: benilla `docs/CONTRIBUTING.md`).
 - benilla: profiles `dev` (deps opt-3, own crates opt-1), `play` (release + incremental), `ship`
   (fat LTO). Clean `cargo build --profile play -p benilla` = 4m31s. Binary `benilla/target/play/benilla`.
@@ -157,7 +157,8 @@ reference until classiccraft catches up.
      the player's own hits), per-attacker hits, `applyWowDamage`, mob export 5 Hz; tuning
      `combatgain=` / `takengain=` in `/dev/shm/classiccraft_combat`. Damage scale: 20 MC damage =
      a typical creature's health at the relevant level (player hits: player level).
-   - Death: MC death -> `CMSG_CC_DIED` (server lifts god mode for the kill); MC respawn -> repop.
+   - Death: MC death -> `CMSG_CC_DIED` (server lifts god mode for the kill); MC respawn -> repop
+     (replaced by 13w: resurrect at bed/hearth).
      User-confirmed live 2026-10-02.
    - Pet follow-teleports snap to WoW ground and clear fall distance (`TamableTeleportMixin`).
    - Since: ghost mode (WoW dead/ghost -> Steve invulnerable, invisible, adventure if survival,
@@ -229,7 +230,9 @@ reference until classiccraft catches up.
    - **Underground (Phase 3).** VMaNGOS `MovementHandler.cpp`: both undermap rescues skip bridged
      players. MC mobs > 1 block under their column's top get no WoW proxy. `NaturalSpawnerMixin`:
      spawn tries in filled chunks pick a random column's ground (bedrock+1..top), never the WoW
-     surface (user: MC mobs spawn underground only). `ServerLevelPrecipitationMixin`: no MC snow or
+     surface (user: MC mobs spawn underground only). Every spawn position is checked too
+     (`isValidSpawnPostitionForType`: feet at or under the column's top block, 2026-10-04 - pack members
+     spread sideways into the gap over a lower neighbour's top and the buried rescue lifted them out). `ServerLevelPrecipitationMixin`: no MC snow or
      ice in WoW dimensions (snow layers poked through WoW's ground). benilla: `render.rs` sends MC
      sky light in `uv_b.y`; `wow_model.wgsl` (fork, bit-14 MC meshes) lights MC blocks as
      `tint * (WoW sun/ambient + WoW point lights) * sky + MC torch light`; fork
@@ -244,8 +247,8 @@ reference until classiccraft catches up.
    flight), so MC blocks show only within MC's render distance; buried mobs (> 1 under their
    column top) not exported unless the camera is underground or a dug column is within 1 block.
    Measure: `perf record -t <main tid>` on the host (`distrobox-host-exec`), `--call-graph lbr`.
-   Buried sections cost only ~0.3 ms (hidden vs shown A/B). The DP-2 monitor is 165 Hz, HDMI-A-1
-   60 Hz (vsync caps at 60 there); `WOW_NOVSYNC=1` for uncapped runs. Open: a WoW area sometimes
+   Buried sections cost only ~0.3 ms (hidden vs shown A/B). Vsync caps at the monitor's rate
+   (this machine's monitors: `CLAUDE.local.md`); `WOW_NOVSYNC=1` for uncapped runs. Open: a WoW area sometimes
    stays unloaded until walked into, MC chunks show there (not yet diagnosed).
    Parked (user, 2026-10-02, "super niche"): with the camera below WoW's ground, a jagged
    head-and-shoulders shape centred on screen hides Minecraft water (translucent) behind it; it
@@ -253,8 +256,6 @@ reference until classiccraft catches up.
    WoW body (the first-person fade already hides its parts, `player/camera.rs`; hiding the unit
    too changed nothing) - suspect a camera-attached benilla pass gated by being under the ground
    (`CameraUnderground` / storm fog / weather) writing depth.
-   Also open: the KWin rule (`~/.config/kwinrulesrc`, class `benilla`, screen 0) doesn't put the
-   window on DP-2 - try screen 1 (user: low priority).
 10. **Outdoor water** (2026-10-02) - built, then PARKED by the user as a finishing touch:
    `McwowTerrainFill.WATER_ENABLED = false`; while off each chunk's placed water is removed once per
    session with its data, so Steve walks through WoW water again. What exists: benilla `terrain.rs`
@@ -272,8 +273,8 @@ reference until classiccraft catches up.
    Kept on: boats on WoW land (`BoatItemMixin` lifts placement onto WoW ground; boats step 1/3
    block; ground friction from the column's top block) - user picked "vanilla-like on land".
 11. **Leveling** (2026-10-02; design in project memory `game-design`): the WoW server keeps the
-   character's level/XP; kill XP waits in Minecraft XP orbs. VMaNGOS: `Rate.XP.*` = 3 in the live
-   `mangosd.conf`; `Player::GiveXP` hook `ClassicCraft::HoldKillXP` holds a bridged player's kill
+   character's level/XP; kill XP waits in Minecraft XP orbs. VMaNGOS: `Rate.XP.*` = 2 in the live
+   `mangosd.conf` (3 until 2026-10-04; user: 2x so each zone gets explored); `Player::GiveXP` hook `ClassicCraft::HoldKillXP` holds a bridged player's kill
    XP in a per-player ledger and sends `SMSG_CC_XP_DROP` (833: id, victim guid, corpse xyz, XP,
    level, rank; none for 0 XP); `CMSG_CC_XP_CLAIM` (834: id, XP) grants it through `GiveXP` as
    kill XP (`ClaimedKill` guid for the rested bonus and XP message; `SendLogXPGain` takes a guid
@@ -283,7 +284,7 @@ reference until classiccraft catches up.
    session-only attachment; `ExperienceOrbMixin` (no merging, claim on pickup, step 0.6 on WoW
    ground). Minecraft's own XP bar IS the WoW level (user): `McwowXp.mirrorLevel` sets level and
    progress every server tick; `PlayerXpMixin` cancels vanilla XP gains and death XP in WoW
-   dimensions (enchanting tables/anvils are gated by the level and can't lower it; enchanting is
+   dimensions (enchanting tables are gated by the level and can't lower it; anvils cost no levels (26); enchanting is
    to become books-only eventually). Verified live: Mangy Wolf 225 XP in 3
    orbs, claimed, harming-arrow kills too. Exporter fixes found on the way: `submitCustomGeometry`
    (XP orbs), translucent render types blended, no-cull types two-sided (elytra), WoW stand-ins
@@ -349,7 +350,7 @@ reference until classiccraft catches up.
      on that surface (mobs one 1/8 sub-voxel cell higher: set inside a cell they fell back through
      it - a horse re-buried twice a second for 7 s); both log `buried at`. Dismounts land on the hidden top block (vanilla's
      dismount search sees real blocks only) and are fixed by the rescue. User-confirmed live 2026-10-02.
-   - Parked: invisible silhouette over below-ground water (see Performance), KWin screen rule,
+   - Parked: invisible silhouette over below-ground water (see Performance),
      small doodads (skulls) floating over holes (user: leave as is).
 13a. **Transports** (2026-10-02; user: walk around on decks as in WoW, companions left behind, no
    building aboard; Deeprun Tram first). Deeprun Tram user-confirmed live 2026-10-02 ("can't find
@@ -732,6 +733,21 @@ reference until classiccraft catches up.
    that pose and the WoW body followed (z 38 -> -1449). Now: `stream_cells` sends nothing while a
    cinematic plays (the mod keeps its cells), `bridge.rs` holds Placing during one and places
    afresh ("cinematic over") when it ends. OPEN: test.
+13w. **Death: keep items, respawn at bed or hearth** (2026-10-04; OPEN: test live). User: items kept
+   on death; Respawn brings the character back at Steve's bed, else at WoW's hearthstone location
+   (no ghost run, no graveyard). Mod: `PlayerKeepInventoryMixin` (no drop in a WoW map dim) +
+   `McwowCombat` COPY_FROM (inventory handed over); `ServerPlayerMixin.findRespawnPositionAndUseSpawnBlock`
+   (dead, died in the active WoW dim): a non-forced respawn point in a `mcwow:map_<id>` dim = the bed
+   (vanilla respawns there, WoW coords sent), else Steve respawns where he died (no stored forced
+   point any more - /spawnpoint doesn't count as a bed) and the server sends the character home;
+   `REN_RESPAWN` (20: u32 kind 0 home / 1 at, u32 map, f32 x, y, z, o) on AFTER_RESPAWN. benilla crate
+   `combat.rs` -> `CMSG_CC_RESPAWN` (838; replaces the repop; kept until in world). VMaNGOS
+   `HandleCCRespawnOpcode`: ResurrectPlayer(1.0, no sickness) + SpawnCorpseBones, TeleportTo the bed
+   (non-instanced map, valid coords) else TeleportToHomebind (no hearth cooldown); no IsBridged check
+   (HELLO is off while dead); logs `respawned at the bed` / `at the hearthstone location`. WoW's
+   DEATH popup is not forwarded to Minecraft (`input.rs forward_popups` skips `which == "DEATH"`; it
+   released to a graveyard before Minecraft's death screen). Releasing through WoW's own UI (WoW UI
+   mode) still makes a ghost at the graveyard.
 13. **First push** (2026-10-04): all three repos committed and pushed under the Cripey account
    (noreply 337582048+Cripey@users.noreply.github.com): Cripey/classiccraft `main`; the forks' work
    rebased onto upstream's latest and pushed to their default branches (benilla `main`, VMaNGOS
@@ -743,12 +759,15 @@ reference until classiccraft catches up.
      in the OFFICIAL launcher (installed into ~/.minecraft, profile "classiccraft", gameDir
      ~/.minecraft/classiccraft - never launched yet); a real login on a fresh install; Arch-native
      and fresh-machine package installs; minecraft-install.sh should warn when the launcher is
-     open (it can overwrite launcher_profiles.json on exit). A friend's Arch + Ubuntu-distrobox
-     guide is an artifact (claude.ai/artifact/Ad46dLEKViCBBM5uYbAMvn). Windows support later (user).
+     open (it can overwrite launcher_profiles.json on exit). Windows support later (user).
      No LICENSE file yet (fabric.mod.json says MIT) - user to decide.
    - The running mangosd predates the forks' rebase onto upstream (benilla main af9bc978, VMaNGOS
      development 66dd40fff, both built): `tools/server.sh stop && tools/build.sh server &&
      tools/server.sh start` when the user isn't playing.
+   - Hole walls breakable (2026-10-04; user-confirmed): `McwowTargeting.skirtHit` walks the crosshair
+     ray column by column; crossing from an open column into a closed one between its top block + 1
+     and the WoW ground (the drawn wall) targets that column's top block. Was: the ray passed through
+     the wall (render-only) and broke the block behind.
    - Test first (built, not yet confirmed live): 13v race intro (skip with ESC from Minecraft mode,
      no fall; also a full unskipped intro), 13u zone ores (copper in Elwynn, tin in Westfall, iron in
      Duskwood; rares 16-24+ blocks down), 13t leftovers (caves walling themselves as you walk, water
@@ -766,6 +785,149 @@ reference until classiccraft catches up.
    - Bows/crossbows item level (projectiles still use the character level); stable masters (farm
      animals); WoW tree chopping; MC mobs spawning in the dark on player bases (user: not now);
      the rest of the Elwynn slice polish (vendor prices, emerald rates, ore rates - tune by playtesting).
+
+15. **Progression sim** (2026-10-04, user: on demand, rough model, output for Claude). `tools/progression.sh`
+   [--accept] [--fresh] [--route <json>]: a deterministic expected-value walk of one player 1-60 along
+   `tools/progression/route_alliance.json` (Elwynn -> ... -> Eastern Plaguelands, zone ids + leave levels).
+   RUN IT after changing loot, gear/materials, recipes, vendors, quest rewards, ores, XP rates or combat
+   scaling, read the printed head (summary, changes vs baseline, flags), and say what moved; `--accept`
+   only when the user accepts the new numbers (baseline `tools/progression/baseline.json`, committed).
+   Pieces: `extract.py` (DB -> `build/progression/wow.json`: quests by zone incl. sub-areas, creatures with
+   health/hit from creature_classlevelstats, spawns by .map area, quest-drop chances SIGNED - only negative
+   ones reach a bridged player, vendors by zone); `McwowSimExport` (mod, `./gradlew runSim -PsimIn= -PsimOut=`,
+   headless server in `fabric/build/sim-server`, ~11 s, rerun when fabric/src/main or wow.json change) writes
+   `rules.json` FROM THE MOD'S OWN CODE: stamped gear stats, assembled recipes, `McwowLoot.roll` sampled per
+   creature (roll split out of `drop` for this), `McwowDialog.toMinecraft` per reward item,
+   `McwowVendors.offersFor` per vendor, branch mining through `McwowTerrainFill.rock` per zone and depth,
+   block drops/dig times per pickaxe, `wowDamage`/`mcDamage`/`armorFactor` tables; `sim.py` (mirrors only
+   VMaNGOS's kill/quest XP formulas and the quest-money emerald rule; everything else it assumes is a KNOB
+   listed in the report). Model: quests in level order (chains within the route, exclusive groups), fights as
+   time-to-kill + damage taken (Minecraft armor + armorFactor), food for healing, durability + anvil repairs
+   from mined bars, crafting/buying/mining for upgrades (gain per minute, trips <= 90 min), stock of repair
+   bars when leaving a zone, grinding when quests run out. Herbs and brewing (2026-10-04, `alchemy.py`; user: "uses
+   what it can brew", brewing time not counted): herb nodes per zone gathered on the way, brewing steps from the
+   export (Minecraft's own brewing recipes tried with the real herb stacks), Healing in dangerous fights,
+   Strength/Swiftness kept up, Regeneration while resting, ingredients and bottles bought from zone vendors when
+   missing; the report runs a second walk without alchemy and prints the difference. Report sections: flags, zones, quests the bridge
+   can't complete (with ids), hardest fights, per level, gear/mining log, materials ledger.
+   First findings (2026-10-04, 3x XP, 45.6 h to 60; at 2x - the accepted baseline - 63.6 h, 461 quests,
+   ~1800 emeralds unspent): cloth (all tiers) and medium/heavy leather have no
+   use but selling (iron/bronze armor beat leather of the same band); ~1100 emeralds unspent at 60 (few
+   sinks); L1-5 fights cost ~8.5 of 20 hp (takengain 2.5) and food runs out before emeralds exist; 26
+   quests need normal WoW loot drops (cleared for bridged players); at 3x XP each zone's quests are half
+   done when its leave level is reached; Duskwood's ground has no copper (bronze repairs need bars carried in).
+
+16. **Armor classes** (2026-10-04, user; OPEN: test live). Metal / leather / cloth split a tier's base points
+   (the material's armor twin) into physical (armor attribute, scaled at stamping) and spell protection
+   (`McwowGear.CLASS_WEIGHTS` 1.0/0.4, 0.7/0.7, 0.4/1.0; `spellProtection`). The actors damage ring's school
+   (offset 28, SpellSchoolMask) is read now: non-physical hits are `indirectMagic` (vanilla armor skips them)
+   cut by spell protection through `CombatRules.getDamageAfterAbsorb`. Cloth tiers linen..runecloth
+   (`McwowGear` materials = the cloth item ids, recipes from gen_mod_data.py), WoW cloth rewards -> cloth
+   (`McwowDialog.cloth`), armor vendors sell cloth too. Design topics: `docs/topics.md`.
+
+17. **WoW ore veins with a pickaxe** (2026-10-04, user; OPEN: test live - needs the new mangosd, benilla and mod).
+   Client `McwowGather` (cursor kind 11 "Mine"; reach by distance, 5 blocks - WoW's unable flag means "no
+   Mining skill" there): a pickaxe that is the correct tool for the vein's ore block (`McwowNodes.forName`: copper
+   /tin/iron 3 blocks, silver/gold/truesilver 2, mithril/dark iron/thorium 3, rich thorium 5, incendicite/
+   bloodstone redstone, ooze-covered = the metal), time = Minecraft's per-block time x blocks. Then REN_HARVEST
+   (21, u64 guid) -> crate -> `CMSG_CC_HARVEST` (839): VMaNGOS `HandleCCHarvestOpcode` checks bridged, 10 yd,
+   GO_READY chest with a Mining lock, counts one use by LootHandler's vein rule (skill bonus 0), despawns when used
+   up, logs `harvested vein`; `SMSG_CC_HARVEST` (840: guid, entry, xyz, ok, used up) -> actors ring kind 0x12 ->
+   `McwowNodes.confirm` (pending from the `mcwow:harvest` payload) drops 1-2 of the ore's raw item (`rawOf`: its loot
+   table's item), Fortune as vanilla ore, and wears the pickaxe by the vein's blocks (user: 3 blocks' loot per harvest
+   was far too much - 39 raw copper from one vein). Logs: mod `vein ... mined`, crate `vein ... harvested`.
+
+18. **Chopping WoW trees, option B** (2026-10-04, user; OPEN: test live - needs the new benilla and mod). benilla
+   fork: `NamedHull.id` (FNV-1a of model path + hull bounds to 0.1 yd: stable per tree),
+   `ObjectUnderfoot::doodad_on_ray`; `target/crosshair.rs` reports the doodad hull under the crosshair (12 yd)
+   when nothing WoW-interactive is there, as focus kind 16 (`external::CROSSHAIR_DOODAD`; guid = hull id, name =
+   the model path's last 90 chars), never a WoW right-click. Trees without a collision hull can't be chopped.
+   Mod `McwowTrees` (model -> species/logs/sapling, `Chop` C2S, `Chopped` S2C sync, SavedData
+   `mcwow:chopped_trees` key `<dimension>#<id hex>` -> regrow millis, 30 min), client `McwowGather` (kind 16,
+   5-block reach, `blockTicks` = Minecraft's log break time x logs), `McwowInteract` hint. Log `chopped`.
+   Option A (the tree falls: hide it, re-weld its tile's collision without it, the zone's stump model) is next.
+
+19. **Herbs** (2026-10-04, user; OPEN: test live). Herb nodes (cursor kind 12) go the vein path: client
+   `McwowGather` (reach by distance, hoe/shears speed via the leaves lookalike), REN_HARVEST -> `CMSG_CC_HARVEST`
+   (VMaNGOS now takes Herbalism locks too; logs `harvested node`) -> `McwowNodes.confirm` drops `herbStack`: the
+   vanilla ingredient with ITEM_NAME = the WoW herb and ITEM_MODEL `mcwow:herb/<id>`, so vanilla brewing takes it.
+   Table: `tools/gen_mod_data.py` HERBS -> `resources/mcwow/herbs.json` + item models (vanilla textures, tinted).
+   Herb names are matched before vein words ("Silverleaf" contains "silver"). Log `herb ... gathered`.
+   Vendors (same day, user): `McwowVendors.LIMITED` brewing ingredients (nether wart, blaze powder, sugar, glistering
+   melon, glowstone, redstone) are limited supply - 4 lots per vendor entry, one back per 10 min after a sale
+   (SavedData `mcwow:vendor_stock`, applied when the trade screen opens, `notifyTrade` records sales); general goods
+   sell glass bottles and brewing stands.
+
+20. **Difficulty curve** (2026-10-04, user: early easier, later firmer, the hard part is dungeons/raids; hits to kill
+   unchanged ~4). WoW hits on the PLAYER x `McwowCombat.takenCurve(attacker level)` (on top of armorFactor and the
+   `takengain` tuning; Minecraft mobs hit by WoW creatures don't get it). Targets live in `sim.py TARGET_TAKEN`
+   (hits a player in gear of their level takes from an even-level normal creature: 10/9/8/7/6/6 per 10-level band);
+   `tools/progression.sh --fit-taken` prints anchors meeting them - paste into `TAKEN_CURVE`, rerun until the
+   factors are ~1. The report's "Difficulty curve" table and `curve_off` flag watch it after every change.
+
+21. **Hitboxes** (2026-10-04, user; OPEN: test live - needs the new benilla AND mod: actors file v7). WoW's collision
+   boxes are much smaller than big models. (A) `McwowAim` (from `MinecraftAttackMixin.startAttack`): benilla's
+   crosshair focus (kind 1 = attack, picked against the posed render mesh) within `entityInteractionRange` and
+   nearer than Minecraft's own hit (`McwowInteract.wowNearer`) becomes the hit result on that creature's stand-in
+   (`McwowActorEntity` GUID now synced). (B) benilla `UnitSnapshot.model_height/model_width` = the unit's
+   `ModelBound` (armed-idle box, model space) x its scale -> actor bytes 72/76 -> stand-in size; `McwowCreatureSizes`
+   (DBC collision size, `MCWOW_DBC_DIR` - still the WotLK files on this machine) only until the model loads.
+
+22. **WoW weapon models** (2026-10-04, user: blocky 3D, on demand; OPEN: test live, tune display angles). Add a
+   weapon to `fabric/src/main/resources/mcwow/wow_weapons.json` (key, name, model_item = WoW item id, base, voxels,
+   creative, rarity, gear) and run `tools/wow-weapons.sh` (--force to rebuild): item display id from the DB ->
+   benilla `cc_weapon <display> <key> <voxels>` (M2 opaque/alpha-key batches voxelised, colours quantised to a 16x16
+   palette, same-colour cubes merged, long axis = Y with the grip at y 8, display transforms in the generated
+   model) -> local pack `~/.local/share/classiccraft/resourcepack` (pack.mcmeta min/max format 97) + previews in
+   `.../weapon_previews/`. The mod adds the pack as required/top (client `PackRepositoryMixin` when the repository
+   has a `ClientPackSource`) and builds the stacks (`McwowWowWeapons`: ITEM_NAME, ITEM_MODEL `mcwow:wow/<key>`,
+   rarity, gear stamp). No WoW art in the repo or the jar. cc_weapon also: poses vertices at the Stand sequence's first
+   frame (bone skinning, as dances.rs), centres width/thickness and mirrors meshes that are >= 80% symmetric (user: the
+   sword wasn't symmetric), finds the grip by growing from WoW's grip point (the origin) while rows stay narrow (a
+   shaft > 8 rows: the origin itself) and computes the hold transforms so the hand sits HAND_BIAS (1.5) above it
+   (user: held by the pommel, then clipped it). `CC_WEAPON_DEBUG=1` prints batches, bones and alpha drops. Weapons
+   so far: The Sword of a Thousand Truths (The Hungering Cold's model), Thunderfury, Sulfuras, Atiesh - creative only.
+
+23. **Third-person camera** (2026-10-04, user-confirmed vs WoW geometry): client `CameraZoomMixin` (Camera.getMaxZoom
+   RETURN) runs vanilla's 8 corner rays against `McwowGeomStore.clip` (WoW triangles + decks, world coords) and
+   `McwowTargeting.skirtDistance` (hole walls; shares the column walk with the crosshair's skirtHit). OPEN: hole walls.
+24. **Player updates** (2026-10-04): `tools/update.sh` is the one command (pull 3 repos -> re-exec if update.sh changed ->
+   build -> db-setup -> server confs when `server-config.sh` changed -> `tools/wow-weapons.sh` -> minecraft-install ->
+   restart server). A player on an older update.sh runs `git pull && tools/update.sh` once.
+
+25. **Treasure chests + enchantments in the sim** (2026-10-04, user; OPEN: test live - needs mangosd (built + installed,
+   not restarted: a character was online) and the mod). `docs/topics.md` rows 32-35. Server: `HandleCCHarvestOpcode`
+   takes chests with WoW's Treasure lock case, continent, no quest loot (`HaveQuestLootFor`), questId 0 -> consumed, no
+   loot, `[classiccraft] ... opened treasure`. Mod `McwowChests` (chests.json from `tools/treasure_chests.py`; rerun after
+   DB changes), harvest path shared with veins (`McwowNodes` Harvest/confirm); right-click opens an unlocked chest
+   (`McwowInteract.tryUse` -> `McwowGather.openChest`, user 2026-10-04), locked ones are pried with a pickaxe by holding
+   attack (`McwowGather`, `pryBlock`). First live try failed only because mangosd predated the handler (restarted 18:24).
+   Sim: `tools/progression/treasure.py`, export `enchanting` + `chests` (McwowSimExport), extract `chests` per zone (pool
+   share of spawns up). Enchantments (row 34, user's 1/2/4/5): `McwowEnchants` (curated pool, random on dropped gear,
+   books, set from WoW stats on quest rewards), `McwowLoot` gear drops + Looting, `McwowCreatureKinds` (Smite/Bane by
+   entry, `tools/creature_kinds.py`). benilla `DialogItem` + geom MSG_DIALOG item rows now carry stats (n + type/value
+   pairs), 6 resistances, damage school - benilla and mod must be updated together. Difficulty curve refitted with
+   enchanted gear as the norm (user: enchantments are to be used 1-60): `TAKEN_CURVE` {0.40, 0.80, 1.23, 2.71, 4.43,
+   4.82}, refitted again after early books: {0.40, 0.83, 1.23, 2.59, 4.88, 5.38}). Early sources (user 1 + 3): enchanting suppliers sell books
+   by the buyer's level (`McwowVendors.books`, limited stock keyed by enchantment), chests to L20/30 +45/20% book chance.
+   Sim knobs `enchant_*`, `emerald_reserve` (topics row 36).
+
+26. **WoW anvils** (2026-10-04, user; OPEN: test live): right-click a WoW anvil (spell-focus object "Anvil", focus kind 0,
+   or an anvil doodad, kind 16) -> Minecraft's anvil screen (`McwowAnvils`, `McwowInteract.anvil`). Mod only.
+   Anvils in WoW dims cost only materials (user): `AnvilMenuMixin` (no level check/charge, no 40-level cut),
+   `AnvilScreenMixin` (no cost label).
+
+## Session 2026-10-04 (second half) - state at wrap-up
+- NOTHING of this session is committed: classiccraft (~70 files), benilla (~12), VMaNGOS (~6). Commit/push only when
+  the user says (memory `fork-commit-policy`); scrub personal data first.
+- Built this session, live-test status in `docs/topics.md` (rows 1-31 = every topic discussed, decided or open):
+  progression sim (15), 2x XP, copper in iron zones, ore veins + yield fix, herbs + brewing, limited vendor stock,
+  armor classes (16), difficulty curve (20), hitboxes (21), WoW weapon models (22), tree chopping B (18), camera (23).
+- User-confirmed live: veins (yield fix requested and done), sword model look/symmetry/grip, camera vs WoW geometry.
+- Open design topics: emerald storage/sinks (#7, #8), waygate seller (#9), blocked quests (#10, parked), mounts (#17),
+  water/fishing (#20), rested XP (#21), reputation menu + At War (#19, decided), bags (#18, decided), tree option A.
+- Lesson: an edit script did `open(p,'w').write(open(p).read())` and emptied sim.py (restored from Claude Code's
+  file-history). Always read before opening for write.
 
 ## What carries over from mcwow
 - Fabric mod (`azerothcore-mc/fabric/`): triangle collision (McwowTriCollider), block/entity

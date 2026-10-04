@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Write the server's mangosd.conf / realmd.conf from VMaNGOS's .dist defaults plus classiccraft's
-# settings (ports and DB login from tools/config.sh, data/log paths, 3x XP). Existing files are
+# settings (ports and DB login from tools/config.sh, data/log paths, 2x XP). Existing files are
 # kept as <name>.conf.bak. Usage: tools/server-config.sh [output dir, default the server's etc/]
 set -euo pipefail
 . "$(dirname "$0")/config.sh"
@@ -32,7 +32,7 @@ set_key CharacterDatabase.Info "\"$(db characters)\"" "$m"
 set_key LogsDatabase.Info "\"$(db logs)\"" "$m"
 set_key WorldServerPort "$CC_WORLD_PORT" "$m"
 set_key BindIP '"127.0.0.1"' "$m"
-for r in Kill Kill.Elite Quest Explore; do set_key "Rate.XP.$r" 3 "$m"; done
+for r in Kill Kill.Elite Quest Explore; do set_key "Rate.XP.$r" 2 "$m"; done
 
 r="$out/realmd.conf"
 set_key LoginDatabaseInfo "\"$(db realmd)\"" "$r"

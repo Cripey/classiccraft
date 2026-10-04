@@ -34,7 +34,9 @@ import org.slf4j.LoggerFactory;
  *  - the corpse's WoW money as emeralds (one per EMERALD_COPPER(level), the rest by chance);
  *  - the creature's theme (resources mcwow/creature_themes.json, tools/creature_themes.py): kobolds
  *    torches and candles, spiders string, skeletons bones, fire elementals blaze powder...;
- *  - elites, rares and bosses: a chance at an enchanted book of their level.
+ *  - elites, rares and bosses: a chance at an enchanted book of their level (McwowEnchants' pool);
+ *  - creatures that carry gear: a chance at a levelled piece with random enchantments (gearChance);
+ *  - Looting on the killer's weapon: more leather, cloth and themed drops.
  * Items pop out of the corpse like a Minecraft mob's drops.
  */
 public final class McwowLoot {
@@ -156,8 +158,8 @@ public final class McwowLoot {
         return BuiltInRegistries.ITEM.getValue(Identifier.fromNamespaceAndPath("mcwow", id));
     }
 
-    private static int roll(int min, int max) {
-        return min + (max > min ? RANDOM.nextInt(max - min + 1) : 0);
+    private static int count(RandomSource random, int min, int max) {
+        return min + (max > min ? random.nextInt(max - min + 1) : 0);
     }
 
     static void drop(ServerLevel level, List<McwowActors.Kill> kills) {
@@ -166,44 +168,98 @@ public final class McwowLoot {
             double y = k.z() / S + 0.5;
             double z = k.x() / S + McwowGeomStore.regionOffsetZ;
             if (!level.isLoaded(BlockPos.containing(x, y, z))) continue;
-            boolean elite = k.rank() == 1 || k.rank() == 2 || k.rank() == 3;
             StringBuilder log = new StringBuilder();
-            if (k.skinnable() && RANDOM.nextFloat() < 0.75F) {
-                int n = (RANDOM.nextFloat() < 0.25F ? 2 : 1) * (elite ? 2 : 1);
-                spawn(level, x, y, z, new ItemStack(mod(McwowOres.LEATHERS[leatherTier(k.level())]), n), log);
-            }
-            if (k.type() == HUMANOID && RANDOM.nextFloat() < (elite ? 0.6F : 0.35F)) {
-                int n = (RANDOM.nextFloat() < 0.25F ? 2 : 1) * (elite ? 2 : 1);
-                spawn(level, x, y, z, new ItemStack(mod(McwowOres.CLOTHS[clothTier(k.level())]), n), log);
-            }
-            if (k.money() > 0) {
-                double emeralds = k.money() / emeraldCopper(k.level());
-                int n = (int) emeralds + (RANDOM.nextDouble() < emeralds - Math.floor(emeralds) ? 1 : 0);
-                if (n > 0) spawn(level, x, y, z, new ItemStack(Items.EMERALD, n), log);
-            }
-            String theme = THEME_OF.get(k.entry());
-            for (Drop drop : theme != null ? THEMES.getOrDefault(theme, List.of()) : List.<Drop>of()) {
-                if (RANDOM.nextFloat() < drop.chance()) {
-                    spawn(level, x, y, z, new ItemStack(drop.item(), roll(drop.min(), drop.max())), log);
-                }
-            }
-            // rank: 1 elite, 2 rare elite, 3 boss, 4 rare
-            float book = switch (k.rank()) {
-                case 1 -> 0.08F;
-                case 2 -> 0.4F;
-                case 3 -> 0.6F;
-                case 4 -> 0.3F;
-                default -> 0.0F;
-            };
-            if (book > 0 && RANDOM.nextFloat() < book) {
-                ItemStack b = EnchantmentHelper.enchantItem(RANDOM, new ItemStack(Items.BOOK),
-                        Math.clamp(k.level() / 2, 1, 30), level.registryAccess(), Optional.empty());
-                spawn(level, x, y, z, b, log);
-            }
+            int looting = looting(level, x, y, z);
+            for (ItemStack stack : roll(k, looting, RANDOM, level.registryAccess())) spawn(level, x, y, z, stack, log);
             LOGGER.info("mcwow-bridge: loot of creature {} (level {}, rank {}, type {}, theme {}, {} copper, {} quest items bagged):{}",
-                    k.entry(), k.level(), k.rank(), k.type(), theme, k.money(), k.questItems(),
+                    k.entry(), k.level(), k.rank(), k.type(), THEME_OF.get(k.entry()), k.money(), k.questItems(),
                     log.isEmpty() ? " nothing" : log);
         }
+    }
+
+    /** Looting on the weapon of the player nearest the corpse (the killer: solo play), 0 if none within 48. */
+    private static int looting(ServerLevel level, double x, double y, double z) {
+        var p = level.getNearestPlayer(x, y, z, 48.0, false);
+        if (p == null) return 0;
+        return EnchantmentHelper.getItemEnchantmentLevel(level.registryAccess().lookupOrThrow(
+                net.minecraft.core.registries.Registries.ENCHANTMENT).getOrThrow(
+                net.minecraft.world.item.enchantment.Enchantments.LOOTING), p.getMainHandItem());
+    }
+
+    public static List<ItemStack> roll(McwowActors.Kill k, RandomSource random, net.minecraft.core.RegistryAccess access) {
+        return roll(k, 0, random, access);
+    }
+
+    /**
+     * One kill's loot (drop() spawns it; the progression sim samples it). Looting (2026-10-04) adds
+     * 0..level to every leather, cloth and themed drop that drops, as vanilla's looting does.
+     */
+    public static List<ItemStack> roll(McwowActors.Kill k, int looting, RandomSource random, net.minecraft.core.RegistryAccess access) {
+        List<ItemStack> out = new java.util.ArrayList<>();
+        boolean elite = k.rank() == 1 || k.rank() == 2 || k.rank() == 3;
+        if (k.skinnable() && random.nextFloat() < 0.75F) {
+            int n = (random.nextFloat() < 0.25F ? 2 : 1) * (elite ? 2 : 1);
+            out.add(new ItemStack(mod(McwowOres.LEATHERS[leatherTier(k.level())]), n + random.nextInt(looting + 1)));
+        }
+        if (k.type() == HUMANOID && random.nextFloat() < (elite ? 0.6F : 0.35F)) {
+            int n = (random.nextFloat() < 0.25F ? 2 : 1) * (elite ? 2 : 1);
+            out.add(new ItemStack(mod(McwowOres.CLOTHS[clothTier(k.level())]), n + random.nextInt(looting + 1)));
+        }
+        if (k.money() > 0) {
+            double emeralds = k.money() / emeraldCopper(k.level());
+            int n = (int) emeralds + (random.nextDouble() < emeralds - Math.floor(emeralds) ? 1 : 0);
+            if (n > 0) out.add(new ItemStack(Items.EMERALD, n));
+        }
+        String theme = THEME_OF.get(k.entry());
+        for (Drop drop : theme != null ? THEMES.getOrDefault(theme, List.of()) : List.<Drop>of()) {
+            if (random.nextFloat() < drop.chance()) {
+                out.add(new ItemStack(drop.item(), count(random, drop.min(), drop.max()) + random.nextInt(looting + 1)));
+            }
+        }
+        // rank: 1 elite, 2 rare elite, 3 boss, 4 rare
+        float book = switch (k.rank()) {
+            case 1 -> 0.08F;
+            case 2 -> 0.4F;
+            case 3 -> 0.6F;
+            case 4 -> 0.3F;
+            default -> 0.0F;
+        };
+        if (book > 0 && random.nextFloat() < book) out.add(net.mcwow.bridge.McwowEnchants.book(bookPower(k.level()), random, access));
+        // Gear with random enchantments (2026-10-04, user): WoW's world drops, off the kinds of
+        // creature that carry gear; rares and bosses better and more often.
+        float gear = gearChance(k);
+        if (gear > 0 && random.nextFloat() < gear) {
+            int quality = (k.rank() >= 2 && random.nextFloat() < 0.35F) ? 3 : 2;
+            out.add(net.mcwow.bridge.McwowEnchants.gearPiece(Math.max(1, k.level()), quality,
+                    gearPower(k.level(), quality), random, access));
+        }
+        out.removeIf(ItemStack::isEmpty);
+        return out;
+    }
+
+    private static final int DRAGONKIN = 2, DEMON = 3, GIANT = 5, UNDEAD = 6;
+
+    /** The chance of a gear piece off a kill: humanoids, undead, demons, giants, dragonkin carry gear. */
+    public static float gearChance(McwowActors.Kill k) {
+        int t = k.type();
+        if (t != HUMANOID && t != UNDEAD && t != DEMON && t != GIANT && t != DRAGONKIN) return 0.0F;
+        return switch (k.rank()) {
+            case 1 -> 0.08F;  // elite
+            case 2 -> 0.35F;  // rare elite
+            case 3 -> 0.5F;   // boss
+            case 4 -> 0.25F;  // rare
+            default -> 0.015F;
+        };
+    }
+
+    /** The enchanting power of a dropped gear piece: half the level, more for rare quality. */
+    public static int gearPower(int level, int quality) {
+        return Math.clamp(level / 2 + (quality - 2) * 4, 1, 30);
+    }
+
+    /** The enchanting power of a creature's book (the progression sim reads it too). */
+    public static int bookPower(int level) {
+        return Math.clamp(level / 2, 1, 30);
     }
 
     private static void spawn(ServerLevel level, double x, double y, double z, ItemStack stack, StringBuilder log) {

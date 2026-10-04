@@ -28,6 +28,8 @@ public class McwowActorEntity extends LivingEntity {
 
     private static final EntityDataAccessor<Float> WIDTH = SynchedEntityData.defineId(McwowActorEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> HEIGHT = SynchedEntityData.defineId(McwowActorEntity.class, EntityDataSerializers.FLOAT);
+    /** The WoW creature's guid, for the client too (McwowAim: melee aims at what benilla shows). */
+    private static final EntityDataAccessor<Long> GUID = SynchedEntityData.defineId(McwowActorEntity.class, EntityDataSerializers.LONG);
 
     private long guid;
     private int entry, wowLevel;
@@ -52,12 +54,13 @@ public class McwowActorEntity extends LivingEntity {
         this.setSilent(true);
     }
 
-    public long guid() { return guid; }
+    public long guid() { return level().isClientSide() ? this.entityData.get(GUID) : guid; }
     public int entry() { return entry; }
     public int wowLevel() { return wowLevel; }
 
     public void setWow(long guid, int entry, int level, boolean attackable) {
         this.guid = guid;
+        this.entityData.set(GUID, guid);
         this.entry = entry;
         this.wowLevel = level;
         this.attackable = attackable;
@@ -70,6 +73,7 @@ public class McwowActorEntity extends LivingEntity {
         super.defineSynchedData(builder);
         builder.define(WIDTH, 0.6F);
         builder.define(HEIGHT, 1.8F);
+        builder.define(GUID, 0L);
     }
 
     public void setSize(float width, float height) {
@@ -110,6 +114,7 @@ public class McwowActorEntity extends LivingEntity {
         if (!this.attackable) return;
         boolean thrown = source.getDirectEntity() instanceof net.minecraft.world.entity.projectile.throwableitemprojectile.ThrowableItemProjectile;
         if (dmg <= 0.0F && !thrown) return;
+        if (!(source.getDirectEntity() instanceof Projectile)) dmg += McwowCreatureKinds.bonus(this.entry, source, level);
         this.pendingDamage += Math.max(0.0F, dmg);
         if (source.getDirectEntity() instanceof Projectile) this.pendingFlags |= HIT_PROJECTILE;
         if (thrown) this.pendingFlags |= HIT_THROWN; // egg / snowball: pulls aggro (user's choice)

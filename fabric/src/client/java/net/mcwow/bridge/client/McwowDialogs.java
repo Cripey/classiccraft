@@ -86,7 +86,16 @@ public final class McwowDialogs {
             int n = i();
             List<McwowDialog.WowItem> out = new ArrayList<>();
             for (int k = 0; k < n; k++) {
-                out.add(new McwowDialog.WowItem(i(), i(), i(), i(), i(), i(), i(), i(), s()));
+                int id = i(), count = i(), quality = i(), cls = i(), sub = i(), inv = i(), ilvl = i(), req = i();
+                String name = s();
+                // 2026-10-04: stats (type/value pairs), resistances, damage school (McwowEnchants.fromStats)
+                int ns = i();
+                if (ns < 0 || ns > 10) throw new IllegalArgumentException("bad stat count " + ns);
+                int[] stats = new int[2 * ns];
+                for (int k2 = 0; k2 < stats.length; k2++) stats[k2] = i();
+                int[] resist = new int[6];
+                for (int k2 = 0; k2 < 6; k2++) resist[k2] = i();
+                out.add(new McwowDialog.WowItem(id, count, quality, cls, sub, inv, ilvl, req, name, stats, resist, i()));
             }
             return out;
         }

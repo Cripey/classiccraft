@@ -72,8 +72,10 @@ If something fails, fix the cause and run `tools/setup.sh` again; it continues w
 tools/update.sh
 ```
 
-Pulls the latest code for all three projects, rebuilds, updates the database and reinstalls the
-mod into the Minecraft launcher.
+Close the Minecraft launcher first. One command updates everything: pulls the latest code for all
+three projects, rebuilds, updates the database, refreshes the server settings when classiccraft's
+changed (e.g. the XP rate), builds the WoW weapon models from your own WoW install, and reinstalls
+the mod into the Minecraft launcher. The server is restarted if it was running.
 
 ## Settings
 

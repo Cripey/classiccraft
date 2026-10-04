@@ -37,7 +37,9 @@
     "RandomPosMixin",
     "MobWowTargetMixin",
     "TamableTeleportMixin",
-    "PlayerGhostMixin"
+    "PlayerGhostMixin",
+    "AnvilMenuMixin",
+    "PlayerKeepInventoryMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

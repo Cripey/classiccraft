@@ -1,0 +1,27 @@
+{
+  "name": "Alliance, human start",
+  "note": "Classic-style leveling order. The player stays in a zone while it has quests at their level and leaves at `leave` (or when nothing is left). Edit freely; ids are AreaTable zone ids.",
+  "zones": [
+    {"zone": 12,   "name": "Elwynn Forest",        "leave": 10},
+    {"zone": 40,   "name": "Westfall",             "leave": 15},
+    {"zone": 44,   "name": "Redridge Mountains",   "leave": 19},
+    {"zone": 10,   "name": "Duskwood",             "leave": 25},
+    {"zone": 11,   "name": "Wetlands",             "leave": 28},
+    {"zone": 267,  "name": "Hillsbrad Foothills",  "leave": 31},
+    {"zone": 45,   "name": "Arathi Highlands",     "leave": 34},
+    {"zone": 33,   "name": "Stranglethorn Vale",   "leave": 39},
+    {"zone": 15,   "name": "Dustwallow Marsh",     "leave": 41},
+    {"zone": 3,    "name": "Badlands",             "leave": 42},
+    {"zone": 8,    "name": "Swamp of Sorrows",     "leave": 43},
+    {"zone": 440,  "name": "Tanaris",              "leave": 46},
+    {"zone": 357,  "name": "Feralas",              "leave": 47},
+    {"zone": 47,   "name": "The Hinterlands",      "leave": 48},
+    {"zone": 51,   "name": "Searing Gorge",        "leave": 49},
+    {"zone": 490,  "name": "Un'Goro Crater",       "leave": 52},
+    {"zone": 361,  "name": "Felwood",              "leave": 54},
+    {"zone": 46,   "name": "Burning Steppes",      "leave": 55},
+    {"zone": 28,   "name": "Western Plaguelands",  "leave": 57},
+    {"zone": 618,  "name": "Winterspring",         "leave": 58},
+    {"zone": 139,  "name": "Eastern Plaguelands",  "leave": 60}
+  ]
+}

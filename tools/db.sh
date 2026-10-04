@@ -11,7 +11,9 @@ set -euo pipefail
 if [[ $CC_DB_MODE == private ]]; then
   sock="$CC_DB_SOCKET"
   admin() { mariadb --no-defaults --socket="$sock" "$@"; }
-  ping() { mariadb-admin --no-defaults --socket="$sock" ping >/dev/null 2>&1; }
+  # The plain client (mariadb-client-core), not mariadb-admin: that one is in mariadb-client,
+  # which a minimal install doesn't have - the check failed while the server was up.
+  ping() { admin -e "SELECT 1" >/dev/null 2>&1; }
 else
   sock=/run/mysqld/mysqld.sock
   admin() { sudo mariadb --socket="$sock" "$@"; }
@@ -45,7 +47,9 @@ case "${1:-status}" in
         --log-error="$CC_ROOT/data/run/mariadb.err" >/dev/null 2>&1 &
       disown
       wait_up && { echo "MariaDB started (port $CC_DB_PORT)"; exit 0; }
-      echo "MariaDB failed to start; see data/run/mariadb.err" >&2; exit 1
+      echo "MariaDB failed to start. The end of data/run/mariadb.err:" >&2
+      tail -n 15 "$CC_ROOT/data/run/mariadb.err" >&2 2>/dev/null || true
+      exit 1
     fi
     if [[ -d /run/systemd/system ]]; then
       sudo systemctl start mariadb
@@ -59,7 +63,13 @@ case "${1:-status}" in
   stop)
     if ! running; then echo "MariaDB not running"; exit 0; fi
     if [[ $CC_DB_MODE == private ]]; then
-      mariadb-admin --no-defaults --socket="$sock" shutdown
+      pid=$(cat "$CC_ROOT/data/run/mariadb.pid" 2>/dev/null || true)
+      admin -e "SHUTDOWN"
+      # Wait for the process itself, not just the socket: a quick restart would hit its lock.
+      for _ in $(seq 150); do
+        if [[ -n $pid ]]; then kill -0 "$pid" 2>/dev/null || break; else running || break; fi
+        sleep 0.2
+      done
     else
       sudo mariadb-admin --socket="$sock" shutdown
     fi

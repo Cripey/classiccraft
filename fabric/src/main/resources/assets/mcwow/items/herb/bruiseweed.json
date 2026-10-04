@@ -1,0 +1,12 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "mcwow:item/herb/bruiseweed",
+    "tints": [
+      {
+        "type": "minecraft:constant",
+        "value": -8758630
+      }
+    ]
+  }
+}

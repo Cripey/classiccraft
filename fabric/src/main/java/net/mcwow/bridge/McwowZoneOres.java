@@ -20,8 +20,8 @@ import org.slf4j.LoggerFactory;
  * zone gets one mining tier from its level (resources mcwow/area_levels.json, tools/area_levels.py:
  * the median of the zone's sub-area levels): Copper 1-10, Tin 11-20, Iron 21-35, Mithril 36-50,
  * Thorium 51+; Searing Gorge and Burning Steppes add Dark Iron. A tier's ores: its own metal
- * common, the tier below's less so, the rare ones of its band (silver, gold, truesilver) deeper
- * down, and coal, redstone and lapis everywhere (no diamond - not a material here - and no vanilla
+ * common, the tier below's less so (Iron also copper, for bronze), the rare ones of its band
+ * (silver, gold, truesilver) deeper down, and coal, redstone and lapis everywhere (no diamond - not a material here - and no vanilla
  * gold or iron outside their tiers). Ratios after the mine tiers' mixes.
  */
 public final class McwowZoneOres {
@@ -84,8 +84,9 @@ public final class McwowZoneOres {
         Ore[][] base = {
                 {rate(copper, 260), rate(tin, 40), rate(redstone, 60), rate(lapis, 30), rate(coal, 320)},
                 {rate(silver, 45), rate(tin, 240), rate(copper, 100), rate(redstone, 80), rate(lapis, 40), rate(coal, 300)},
-                {rate(gold, 45), rate(silver, 35), rate(iron, 240), rate(tin, 90), rate(redstone, 100), rate(lapis, 50),
-                        rate(coal, 220)},
+                // Copper too (user, 2026-10-04): iron zones start at 21, iron gear at 24 - bronze bridges the gap.
+                {rate(gold, 45), rate(silver, 35), rate(iron, 240), rate(tin, 90), rate(copper, 90), rate(redstone, 100),
+                        rate(lapis, 50), rate(coal, 220)},
                 {rate(truesilver, 40), rate(gold, 50), rate(mithril, 220), rate(iron, 90), rate(redstone, 110),
                         rate(lapis, 55), rate(coal, 150)},
                 {rate(truesilver, 50), rate(gold, 35), rate(thorium, 220), rate(mithril, 90), rate(redstone, 110),

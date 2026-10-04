@@ -1,0 +1,12 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "mcwow:item/herb/grave_moss",
+    "tints": [
+      {
+        "type": "minecraft:constant",
+        "value": -11637958
+      }
+    ]
+  }
+}

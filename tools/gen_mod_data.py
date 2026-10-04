@@ -39,9 +39,60 @@ GEAR = {
     "mithril": ("mcwow:mithril_bar", "chainmail", "iron"), "thorium": ("mcwow:thorium_bar", "diamond", "diamond"),
     "dark_iron": ("mcwow:dark_iron_bar", "netherite", "netherite"),
 }
+# WoW's herbs (user, 2026-10-04): a herb node drops a VANILLA brewing ingredient named after the herb
+# and drawn as its own plant (a vanilla texture, tinted where it is a grey one), so Minecraft's own
+# brewing takes it unchanged. id -> (WoW name, vanilla item, texture, tint or None). McwowNodes reads
+# resources mcwow/herbs.json; the item look is the stack's item_model mcwow:herb/<id>.
+HERBS = {
+    "peacebloom": ("Peacebloom", "glistering_melon_slice", "block/oxeye_daisy", None),
+    "silverleaf": ("Silverleaf", "nether_wart", "block/fern", 0xB8C4CC),
+    "earthroot": ("Earthroot", "blaze_powder", "block/hanging_roots", None),
+    "mageroyal": ("Mageroyal", "sugar", "block/pink_tulip", None),
+    "briarthorn": ("Briarthorn", "spider_eye", "block/dead_bush", None),
+    "stranglekelp": ("Stranglekelp", "pufferfish", "item/kelp", None),
+    "bruiseweed": ("Bruiseweed", "rabbit_foot", "block/fern", 0x7A5A9A),
+    "wild_steelbloom": ("Wild Steelbloom", "rabbit_foot", "block/azure_bluet", None),  # turtle scutes brew nothing
+    "grave_moss": ("Grave Moss", "fermented_spider_eye", "block/short_grass", 0x4E6B3A),
+    "kingsblood": ("Kingsblood", "glistering_melon_slice", "block/poppy", None),
+    "liferoot": ("Liferoot", "ghast_tear", "block/mangrove_propagule", None),
+    "fadeleaf": ("Fadeleaf", "golden_carrot", "block/fern", 0xC8D8B8),
+    "goldthorn": ("Goldthorn", "glowstone_dust", "block/dandelion", None),
+    "khadgars_whisker": ("Khadgar's Whisker", "redstone", "block/short_grass", 0xC8B860),
+    "wintersbite": ("Wintersbite", "phantom_membrane", "block/cornflower", None),
+    "firebloom": ("Firebloom", "magma_cream", "block/torchflower", None),
+    "purple_lotus": ("Purple Lotus", "glowstone_dust", "block/allium", None),
+    "arthas_tears": ("Arthas' Tears", "ghast_tear", "block/blue_orchid", None),
+    "sungrass": ("Sungrass", "blaze_powder", "block/short_grass", 0xE0C040),
+    "blindweed": ("Blindweed", "spider_eye", "block/nether_sprouts", None),
+    "ghost_mushroom": ("Ghost Mushroom", "fermented_spider_eye", "block/brown_mushroom", None),
+    "gromsblood": ("Gromsblood", "blaze_powder", "block/crimson_roots", None),
+    "golden_sansam": ("Golden Sansam", "glistering_melon_slice", "block/sunflower_front", None),
+    "dreamfoil": ("Dreamfoil", "phantom_membrane", "block/lily_of_the_valley", None),
+    "mountain_silversage": ("Mountain Silversage", "ghast_tear", "block/fern", 0xD0D8E0),
+    "plaguebloom": ("Plaguebloom", "fermented_spider_eye", "block/warped_roots", None),
+    "icecap": ("Icecap", "breeze_rod", "block/white_tulip", None),
+    "black_lotus": ("Black Lotus", "dragon_breath", "block/wither_rose", None),
+}
+
+
+def herbs():
+    table = {}
+    for hid, (name, item, texture, tint) in HERBS.items():
+        write(f"assets/mcwow/models/item/herb/{hid}.json",
+              {"parent": "minecraft:item/generated", "textures": {"layer0": f"minecraft:{texture}"}})
+        model = {"type": "minecraft:model", "model": f"mcwow:item/herb/{hid}"}
+        if tint is not None:
+            model["tints"] = [{"type": "minecraft:constant", "value": tint - 0x1000000}]
+        write(f"assets/mcwow/items/herb/{hid}.json", {"model": model})
+        table[name] = {"id": hid, "item": f"minecraft:{item}"}
+    write("mcwow/herbs.json", table)
+
+
 ARMOR = ["helmet", "chestplate", "leggings", "boots"]
 TOOLS = ["sword", "axe", "pickaxe", "shovel", "hoe", "spear"]
 LEATHER_IDS = ["light_leather", "medium_leather", "heavy_leather", "thick_leather", "rugged_leather"]
+# Cloth armor (armor classes, 2026-10-04): leather armor's shapes and look, dyed light by McwowGear.
+CLOTH_IDS = ["linen_cloth", "wool_cloth", "silk_cloth", "mageweave_cloth", "runecloth"]
 
 
 def vanilla_recipe(name):
@@ -62,7 +113,7 @@ def gear_recipes():
             r["group"] = f"mcwow_{piece}"
             r["result"] = {"id": f"minecraft:{armor_look if piece in ARMOR else tool_look}_{piece}"}
             write(f"data/mcwow/recipe/gear/{mat}_{piece}.json", r)
-    for leather in LEATHER_IDS:
+    for leather in LEATHER_IDS + CLOTH_IDS:
         for piece in ARMOR:
             r = vanilla_recipe(f"leather_{piece}")
             r["key"] = {k: f"mcwow:{leather}" for k in r["key"]}
@@ -183,7 +234,8 @@ def main():
         json.dump(lang, f, indent=2)
         f.write("\n")
     gear_recipes()
-    print(f"{len(blocks)} ore blocks, gear recipes for {len(GEAR)} metals + {len(LEATHER_IDS)} leathers")
+    herbs()
+    print(f"{len(blocks)} ore blocks, gear recipes for {len(GEAR)} metals + {len(LEATHER_IDS)} leathers + {len(CLOTH_IDS)} cloths")
 
 
 main()

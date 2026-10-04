@@ -45,14 +45,39 @@ public final class McwowInteract {
         String hint = null;
         if (mc.gui.screen() == null && usable(focus)) {
             boolean gather = (focus.guid() >>> 48) == 0xF110L && (focus.kind() == 3 || focus.kind() == 4 || focus.kind() == 10);
-            hint = (gather ? "Hold attack: Gather " : "Right-click: " + VERBS[focus.kind()] + " ") + focus.name()
-                    + (focus.unable() ? " (too far)" : "");
+            boolean vein = (focus.guid() >>> 48) == 0xF110L && focus.kind() == 11;
+            boolean herb = (focus.guid() >>> 48) == 0xF110L && focus.kind() == 12
+                    && net.mcwow.bridge.McwowNodes.herbFor(focus.name()) != null;
+            var chest = (focus.guid() >>> 48) == 0xF110L ? net.mcwow.bridge.McwowChests.forName(focus.name()) : null;
+            hint = (chest != null ? (chest.pick() > 0 ? "Locked - hold attack with a pickaxe: Pry open " : "Right-click: Open ")
+                    : gather || herb ? "Hold attack: Gather " : vein ? "Hold attack: Mine " : "Right-click: " + VERBS[focus.kind()] + " ")
+                    + focus.name() + (McwowGather.tooFar(focus) ? " (too far)" : "");
+        }
+        if (mc.gui.screen() == null && hint == null && anvil(focus) && mc.player != null && wowNearer(mc, focus)) {
+            hint = "Right-click: Use Anvil" + (focus.distance() > ANVIL_REACH ? " (too far)" : "");
+        }
+        if (mc.gui.screen() == null && hint == null && focus != null && focus.kind() == 16 && mc.player != null) {
+            var tree = net.mcwow.bridge.McwowTrees.forModel(focus.name());
+            if (tree != null && wowNearer(mc, focus)) {
+                long left = McwowGather.choppedFor(mc.player, focus.guid());
+                hint = left > 0 ? tree.name() + " (chopped, regrows in " + Math.max(1, left / 60_000) + " min)"
+                        : "Hold attack: Chop " + tree.name() + (McwowGather.tooFar(focus) ? " (too far)" : "");
+            }
         }
         if (hint != null && !hint.equals(shownHint)) {
             mc.gui.chatListener().handleOverlay(Component.literal(hint).withStyle(
-                    focus.unable() ? ChatFormatting.GRAY : ChatFormatting.YELLOW));
+                    hint.endsWith("(too far)") || hint.endsWith("min)") ? ChatFormatting.GRAY : ChatFormatting.YELLOW));
         }
         shownHint = hint;
+    }
+
+    /** Reach for a WoW anvil (blocks), as Minecraft's own block reach. */
+    private static final double ANVIL_REACH = 4.5;
+
+    /** A WoW anvil under the crosshair: the "Anvil" object (no WoW cursor, kind 0) or an anvil doodad (16). */
+    static boolean anvil(McwowActors.Focus f) {
+        return f != null && f.guid() != 0 && (((f.guid() >>> 48) == 0xF110L && f.kind() == 0) || f.kind() == 16)
+                && net.mcwow.bridge.McwowAnvils.isAnvil(f.name());
     }
 
     private static boolean usable(McwowActors.Focus f) {
@@ -65,8 +90,38 @@ public final class McwowInteract {
      * it acts once.
      */
     public static boolean tryUse(Minecraft mc) {
+        if (mc.player != null && anvil(focus) && wowNearer(mc, focus)) {
+            // A WoW anvil (2026-10-04): Minecraft's anvil screen.
+            if (!useHeld) {
+                useHeld = true;
+                if (focus.distance() > ANVIL_REACH) {
+                    mc.gui.chatListener().handleOverlay(Component.literal("Anvil (too far)").withStyle(ChatFormatting.GRAY));
+                } else {
+                    net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+                            new net.mcwow.bridge.McwowAnvils.OpenAnvil(focus.name()));
+                }
+            }
+            return true;
+        }
         if (mc.player == null || !usable(focus)) return false;
         if (!wowNearer(mc, focus)) return false; // a Minecraft block or entity in front
+        // A treasure chest (user, 2026-10-04): right-click opens it as a Minecraft chest; a locked one
+        // is pried open with a pickaxe (hold attack, McwowGather). Never WoW's own use (WoW's loot).
+        var chest = (focus.guid() >>> 48) == 0xF110L ? net.mcwow.bridge.McwowChests.forName(focus.name()) : null;
+        if (chest != null) {
+            if (!useHeld) {
+                useHeld = true;
+                if (McwowGather.tooFar(focus)) {
+                    mc.gui.chatListener().handleOverlay(Component.literal(focus.name() + " (too far)").withStyle(ChatFormatting.GRAY));
+                } else if (chest.pick() > 0) {
+                    mc.gui.chatListener().handleOverlay(Component.literal("Locked - pry it open with a pickaxe (hold attack)")
+                            .withStyle(ChatFormatting.RED));
+                } else {
+                    McwowGather.openChest(mc, focus);
+                }
+            }
+            return true;
+        }
         if (!useHeld) {
             useHeld = true;
             OUT.incrementAndGet();
@@ -91,13 +146,23 @@ public final class McwowInteract {
             // often the object's own collision, a little in front of where benilla's pick measures
             // it (2026-10-03: gathering only worked aiming beside the object): it hides the WoW
             // target only when clearly in front of it, a wall between.
+            // The same for a hidden ground block (a closed column's top or under it: drawn as WoW's
+            // ground, and McwowTargeting turns an upward WoW-ground hit into it): an ore vein's or a
+            // crate's top read as the dirt under it, which Minecraft then mined (2026-10-04).
             if (hit instanceof net.minecraft.world.phys.BlockHitResult b && mc.level != null
-                    && mc.level.getBlockState(b.getBlockPos()).isAir()) {
+                    && (mc.level.getBlockState(b.getBlockPos()).isAir() || hiddenGround(mc, b.getBlockPos()))) {
                 return d >= f.distance() - 1.0;
             }
             return d >= f.distance();
         }
         return true;
+    }
+
+    /** A block of WoW's ground: at or under its column's top block, the column not dug open. */
+    private static boolean hiddenGround(Minecraft mc, net.minecraft.core.BlockPos pos) {
+        int top = net.mcwow.bridge.McwowColumns.topOf(mc.level, pos.getX(), pos.getZ());
+        return top != net.mcwow.bridge.McwowTerrainFill.NO_TOP && pos.getY() <= top
+                && !net.mcwow.bridge.McwowColumns.isOpen(mc.level, pos.getX(), pos.getZ());
     }
 
     /** A book read from WoW (title, then pages), in Minecraft's book screen; any thread. */

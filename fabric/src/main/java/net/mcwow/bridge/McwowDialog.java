@@ -30,7 +30,8 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
  *    an enchanted book of the item's level;
  *  - bags a bundle, arrows and bullets arrows, food and drink cooked meat or bread, potions a
  *    healing potion; anything else nothing (the WoW item still lands in the WoW bags).
- *  Quality sets the rarity (the name's colour); uncommon and better gear comes enchanted.
+ *  Quality sets the rarity (the name's colour); enchantments are set from the WoW item's stats
+ *  (McwowEnchants.fromStats, 2026-10-04).
  */
 public final class McwowDialog {
     public static final int CLOSE = 0, GOSSIP = 1, QUEST_GREETING = 2, QUEST_DETAIL = 3, QUEST_PROGRESS = 4,
@@ -44,12 +45,21 @@ public final class McwowDialog {
 
     /** A WoW item row. */
     public record WowItem(int id, int count, int quality, int itemClass, int subclass, int inventoryType, int ilvl,
-                          int req, String name) {
+                          int req, String name, int[] stats, int[] resist, int dmgType) {
+        /** stats: (ItemModType, value) pairs; resist: holy, fire, nature, frost, shadow, arcane (2026-10-04). */
+        public WowItem(int id, int count, int quality, int itemClass, int subclass, int inventoryType, int ilvl, int req,
+                       String name) {
+            this(id, count, quality, itemClass, subclass, inventoryType, ilvl, req, name, new int[0], new int[6], 0);
+        }
+
         public static final StreamCodec<RegistryFriendlyByteBuf, WowItem> CODEC = new StreamCodec<>() {
             @Override
             public WowItem decode(RegistryFriendlyByteBuf b) {
-                return new WowItem(b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readVarInt(),
-                        b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readUtf());
+                int id = b.readVarInt(), count = b.readVarInt(), quality = b.readVarInt(), cls = b.readVarInt(),
+                        sub = b.readVarInt(), inv = b.readVarInt(), ilvl = b.readVarInt(), req = b.readVarInt();
+                String name = b.readUtf();
+                int[] stats = b.readVarIntArray(), resist = b.readVarIntArray();
+                return new WowItem(id, count, quality, cls, sub, inv, ilvl, req, name, stats, resist, b.readVarInt());
             }
 
             @Override
@@ -57,6 +67,9 @@ public final class McwowDialog {
                 b.writeVarInt(i.id()).writeVarInt(i.count()).writeVarInt(i.quality()).writeVarInt(i.itemClass())
                         .writeVarInt(i.subclass()).writeVarInt(i.inventoryType()).writeVarInt(i.ilvl()).writeVarInt(i.req());
                 b.writeUtf(i.name());
+                b.writeVarIntArray(i.stats());
+                b.writeVarIntArray(i.resist());
+                b.writeVarInt(i.dmgType());
             }
         };
         public static final StreamCodec<RegistryFriendlyByteBuf, List<WowItem>> LIST =
@@ -96,6 +109,11 @@ public final class McwowDialog {
         return McwowOres.LEATHERS[ilvl <= 17 ? 0 : ilvl <= 27 ? 1 : ilvl <= 37 ? 2 : ilvl <= 47 ? 3 : 4];
     }
 
+    /** A cloth by item level, as the cloth drops: linen to 14, wool 24, silk 34, mageweave 45, runecloth. */
+    public static String cloth(int ilvl) {
+        return McwowOres.CLOTHS[ilvl <= 14 ? 0 : ilvl <= 24 ? 1 : ilvl <= 34 ? 2 : ilvl <= 45 ? 3 : 4];
+    }
+
     /** The vanilla look a material's piece has (McwowGear's mapping; mithril tools look iron). */
     public static String look(String material, String piece) {
         boolean armor = List.of("helmet", "chestplate", "leggings", "boots").contains(piece);
@@ -131,17 +149,17 @@ public final class McwowDialog {
         return quality >= 4 ? Rarity.EPIC : quality == 3 ? Rarity.RARE : quality == 2 ? Rarity.UNCOMMON : Rarity.COMMON;
     }
 
-    /** An enchanted book worth a WoW item of this level and quality. */
+    /** An enchanted book worth a WoW item: its stats' set enchantments (McwowEnchants.fromStats). */
     private static ItemStack book(WowItem w, RegistryAccess access, RandomSource random) {
-        int level = Math.clamp(w.ilvl() / 2 + (w.quality() - 1) * 4, 1, 30);
-        ItemStack b = EnchantmentHelper.enchantItem(random, new ItemStack(Items.BOOK), level, access, Optional.empty());
+        ItemStack b = McwowEnchants.fromStats(new ItemStack(Items.ENCHANTED_BOOK), w, w.itemClass() == CLASS_WEAPON,
+                w.inventoryType() == 8, access);
         b.set(DataComponents.RARITY, rarity(w.quality()));
         return b;
     }
 
     /**
      * What a WoW item is in Minecraft (EMPTY for none). With {@code random} null the result is a
-     * preview: no enchantments rolled (the screen shows "enchanted" instead).
+     * preview (enchantments are set from the item, so the preview shows the real ones).
      */
     public static ItemStack toMinecraft(WowItem w, RegistryAccess access, RandomSource random) {
         int ilvl = Math.max(1, w.ilvl());
@@ -178,7 +196,7 @@ public final class McwowDialog {
                         return new ItemStack(Items.FISHING_ROD);
                     }
                     case 19 -> {
-                        return random == null ? new ItemStack(Items.ENCHANTED_BOOK) : book(w, access, random);
+                        return book(w, access, random);
                     }
                     default -> { }
                 }
@@ -227,12 +245,13 @@ public final class McwowDialog {
         if (piece == null) {
             // A slot Minecraft lacks (wrist, hands, back, jewellery, off-hand): its worth as a book.
             if (armor || w.itemClass() == CLASS_WEAPON) {
-                return random == null ? new ItemStack(Items.ENCHANTED_BOOK) : book(w, access, random);
+                return book(w, access, random);
             }
             return ItemStack.EMPTY;
         }
-        // Cloth and leather armor: a leather; mail, plate and weapons: a metal.
-        String material = armor && w.subclass() <= 2 ? leather(ilvl) : metal(ilvl);
+        // Armor classes (2026-10-04): cloth (and misc) armor a cloth, leather a leather; mail, plate
+        // and weapons a metal.
+        String material = armor && w.subclass() <= 1 ? cloth(ilvl) : armor && w.subclass() == 2 ? leather(ilvl) : metal(ilvl);
         return finish(piece(material, piece, ilvl, w.req()), w, access, random);
     }
 
@@ -246,10 +265,10 @@ public final class McwowDialog {
         if (s.isEmpty()) return s;
         s.set(DataComponents.RARITY, rarity(w.quality()));
         if (!w.name().isEmpty()) s.set(DataComponents.ITEM_NAME, net.minecraft.network.chat.Component.literal(w.name()));
-        if (random != null && w.quality() >= 2) {
-            int level = w.quality() >= 4 ? 30 : w.quality() == 3 ? Math.clamp(w.ilvl() / 2, 5, 30) : Math.clamp(w.ilvl() / 3, 1, 15);
-            s = EnchantmentHelper.enchantItem(random, s, level, access, Optional.empty());
-        }
-        return s;
+        // Set enchantments from the WoW item's stats (2026-10-04): the same for everyone, so the
+        // reward screen shows the real ones.
+        String path = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+        boolean weapon = w.itemClass() == CLASS_WEAPON && !s.is(Items.SHIELD);
+        return McwowEnchants.fromStats(s, w, weapon, path.endsWith("_boots"), access);
     }
 }

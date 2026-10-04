@@ -13,7 +13,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class MinecraftAttackMixin {
     @Inject(method = "startAttack", at = @At("HEAD"), cancellable = true)
     private void mcwow$gatherStart(CallbackInfoReturnable<Boolean> cir) {
-        if (McwowGather.active()) cir.setReturnValue(false);
+        if (McwowGather.active()) {
+            cir.setReturnValue(false);
+            return;
+        }
+        net.mcwow.bridge.client.McwowAim.retarget((Minecraft) (Object) this);
     }
 
     @Inject(method = "continueAttack", at = @At("HEAD"), cancellable = true)

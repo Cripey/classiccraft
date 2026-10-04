@@ -53,6 +53,8 @@ public final class McwowWorldExporter {
     private static final int REN_CHAT = 15; // a "." GM command typed in chat: u32 length, UTF-8
     private static final int REN_INTERACT = 17; // a right-click on the crosshair's WoW target
     private static final int REN_DIALOG = 19; // a choice in a WoW NPC window (McwowDialogs)
+    private static final int REN_HARVEST = 21; // a WoW ore vein mined with a pickaxe: u64 its guid
+    private static final int REN_RESPAWN = 20; // respawned after a death: u32 kind (0 home, 1 at), u32 map, f32 x, y, z, o
     private static final int REN_WAYGATE = 18; // a waygate travel: u32 map, f32 x, y, z, o, u64 owner
     private static int sentGeneration = Integer.MIN_VALUE;
     private static ClientLevel sentLevel;
@@ -92,6 +94,11 @@ public final class McwowWorldExporter {
             if (!McwowRenderLink.write(REN_EVENT, msg, null)) return;
             net.mcwow.bridge.combat.McwowCombat.EVENTS.poll();
         }
+        ByteBuffer respawn;
+        while ((respawn = net.mcwow.bridge.combat.McwowCombat.RESPAWNS.peek()) != null) {
+            if (!McwowRenderLink.write(REN_RESPAWN, respawn.duplicate(), null)) return;
+            net.mcwow.bridge.combat.McwowCombat.RESPAWNS.poll();
+        }
         net.mcwow.bridge.combat.McwowCombat.WowHit hit;
         while ((hit = net.mcwow.bridge.combat.McwowCombat.HITS.peek()) != null) {
             ByteBuffer msg = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN)
@@ -114,6 +121,12 @@ public final class McwowWorldExporter {
             McwowWaygateClient.OUT.poll();
         }
         // Right-clicks on WoW NPCs and objects (McwowInteract).
+        Long vein;
+        while ((vein = McwowGather.HARVESTS.peek()) != null) {
+            ByteBuffer msg = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(vein).flip();
+            if (!McwowRenderLink.write(REN_HARVEST, msg, null)) return;
+            McwowGather.HARVESTS.poll();
+        }
         while (McwowInteract.OUT.get() > 0) {
             ByteBuffer msg = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(0).flip();
             if (!McwowRenderLink.write(REN_INTERACT, msg, null)) return;

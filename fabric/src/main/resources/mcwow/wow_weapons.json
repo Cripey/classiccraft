@@ -1,0 +1,61 @@
+{
+  "_note": "Minecraft weapons drawn with a WoW item's model (2026-10-04). Only these definitions ship; tools/wow-weapons.sh builds the models from the player's own WoW install into ~/.local/share/classiccraft/resourcepack. key: the model id (mcwow:wow/<key>); model_item: the WoW item whose model it wears; base: the Minecraft item underneath; voxels: cubes along the weapon; creative: listed in the creative Combat tab; gear: [material, ilvl, req] stamp (McwowGear), testing values until the weapon's own design.",
+  "weapons": [
+    {
+      "key": "sword_of_a_thousand_truths",
+      "name": "The Sword of a Thousand Truths",
+      "model_item": 23577,
+      "base": "minecraft:netherite_sword",
+      "voxels": 44,
+      "creative": true,
+      "rarity": "epic",
+      "gear": [
+        "dark_iron",
+        60,
+        1
+      ]
+    },
+    {
+      "key": "thunderfury",
+      "name": "Thunderfury, Blessed Blade of the Windseeker",
+      "model_item": 19019,
+      "base": "minecraft:netherite_sword",
+      "voxels": 44,
+      "creative": true,
+      "rarity": "epic",
+      "gear": [
+        "dark_iron",
+        60,
+        1
+      ]
+    },
+    {
+      "key": "sulfuras",
+      "name": "Sulfuras, Hand of Ragnaros",
+      "model_item": 17182,
+      "base": "minecraft:mace",
+      "voxels": 40,
+      "creative": true,
+      "rarity": "epic",
+      "gear": [
+        "dark_iron",
+        60,
+        1
+      ]
+    },
+    {
+      "key": "atiesh",
+      "name": "Atiesh, Greatstaff of the Guardian",
+      "model_item": 22589,
+      "base": "minecraft:netherite_spear",
+      "voxels": 48,
+      "creative": true,
+      "rarity": "epic",
+      "gear": [
+        "dark_iron",
+        60,
+        1
+      ]
+    }
+  ]
+}

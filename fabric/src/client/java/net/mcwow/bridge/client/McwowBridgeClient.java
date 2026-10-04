@@ -123,6 +123,13 @@ public final class McwowBridgeClient implements ClientModInitializer {
         McwowMusicFiles.start(); // the music discs' Ogg files
         ClientTickEvents.END_CLIENT_TICK.register(McwowInteract::tick); // WoW under the crosshair
         ClientTickEvents.END_CLIENT_TICK.register(McwowGather::tick); // gathering WoW objects (after the focus)
+        // Chopped WoW trees (McwowTrees), for the chop hint's regrow time.
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                net.mcwow.bridge.McwowTrees.Chopped.TYPE, (msg, ctx) -> {
+                    for (int k = 0; k < msg.keys().size(); ++k) {
+                        net.mcwow.bridge.McwowTrees.CLIENT_CHOPPED.put(msg.keys().get(k), msg.regrow().get(k));
+                    }
+                });
         McwowWaygateClient.register(); // waygate naming and destinations
         ClientTickEvents.END_CLIENT_TICK.register(McwowDance::tick); // moving ends our own dance
         ClientTickEvents.END_CLIENT_TICK.register(McwowGmChat::tick); // their replies

@@ -106,17 +106,34 @@ public final class McwowCombat {
      * (McwowGear.attackLevel; an iron sword's 6 takes ~30% of a creature of its level), a mob's hits
      * the creature's own. `combatgain=X` in /dev/shm/classiccraft_combat. Eggs/snowballs (0) do 1: aggro.
      */
-    static int wowDamage(float mcDamage, int level) {
+    public static int wowDamage(float mcDamage, int level) {
         readTuning();
         int hp = TYPICAL_HP[Math.max(1, Math.min(80, level)) - 1];
         return Math.max(1, Math.round(mcDamage / 20.0F * hp * gain));
     }
 
     /**
+     * The difficulty curve (user, 2026-10-04: the early game easier, the later game firmer but not
+     * hard - real difficulty is for dungeons and raids): WoW hits on the PLAYER times this, by the
+     * attacker's level. Anchors at the middle of each band (5.5, 15.5 .. 55.5), linear between, flat
+     * outside. Fitted with the progression check (tools/progression.sh --fit-taken) so an even-level
+     * normal creature takes ~10 / 9 / 8 / 7 / 6 / 6 hits to kill a player in gear of their level.
+     */
+    private static final float[] TAKEN_CURVE = {0.40F, 0.83F, 1.23F, 2.59F, 4.88F, 5.38F};
+
+    public static float takenCurve(int attackerLevel) {
+        float x = (attackerLevel - 5.5F) / 10.0F;
+        if (x <= 0) return TAKEN_CURVE[0];
+        if (x >= TAKEN_CURVE.length - 1) return TAKEN_CURVE[TAKEN_CURVE.length - 1];
+        int i = (int) x;
+        return TAKEN_CURVE[i] + (TAKEN_CURVE[i + 1] - TAKEN_CURVE[i]) * (x - i);
+    }
+
+    /**
      * WoW damage -> Minecraft damage, the inverse at the attacker's level: a hit worth 10% of a typical
      * creature health at its level takes 10% of 20 (before Minecraft armor). `takengain=X`.
      */
-    static float mcDamage(int wowDamage, int attackerLevel) {
+    public static float mcDamage(int wowDamage, int attackerLevel) {
         readTuning();
         int hp = TYPICAL_HP[Math.max(1, Math.min(80, attackerLevel)) - 1];
         return wowDamage / (float) hp * 20.0F * takenGain;
@@ -133,11 +150,63 @@ public final class McwowCombat {
     public static void init() {
         FabricDefaultAttributeRegistry.register(WOW_ACTOR, LivingEntity.createLivingAttributes());
         ServerTickEvents.END_SERVER_TICK.register(McwowCombat::serverTick);
-        // Minecraft's Respawn = WoW's release spirit (then a corpse run, user's choice).
+        // Minecraft's Respawn = WoW's release spirit: the WoW character comes back to life at the bed
+        // or its hearthstone location (ServerPlayerMixin picked which, user 2026-10-04).
         net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
-            if (!alive && McwowGeomStore.activeDimension != null) EVENTS.add(2);
+            java.nio.ByteBuffer respawn = pendingRespawn;
+            pendingRespawn = null;
+            if (!alive && respawn != null) {
+                RESPAWNS.add(respawn);
+                LOGGER.info("mcwow-bridge: respawned {}", respawn.getInt(0) == 1
+                        ? "at the bed (WoW map " + respawn.getInt(4) + ")" : "where Steve died; the WoW character goes home");
+            }
+        });
+        // Items stay with the player through a death in a WoW map (user, 2026-10-04); the drop is
+        // skipped by PlayerKeepInventoryMixin. The XP bar is the WoW level (McwowXp.mirrorLevel).
+        net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents.COPY_FROM.register((oldPlayer, newPlayer, alive) -> {
+            if (!alive && keepsInventory(oldPlayer)) newPlayer.getInventory().replaceWith(oldPlayer.getInventory());
         });
     }
+
+    /** Whether a player dying now keeps their items: in a WoW map dimension. */
+    public static boolean keepsInventory(net.minecraft.world.entity.player.Player player) {
+        return wowMapOf(player.level().dimension()) >= 0;
+    }
+
+    /** The WoW map id of a WoW map dimension (mcwow:map_<id>), or -1. */
+    public static int wowMapOf(ResourceKey<net.minecraft.world.level.Level> dim) {
+        var id = dim.identifier();
+        if (!id.getNamespace().equals("mcwow") || !id.getPath().startsWith("map_")) return -1;
+        try {
+            return Integer.parseInt(id.getPath().substring(4));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /** Fixed mapping (protocol/mcwow_protocol.h): 1 block = 1.4667 yd. */
+    private static final double BLOCKS_TO_YARDS = 1.4667;
+    private static volatile java.nio.ByteBuffer pendingRespawn;
+
+    /**
+     * Where the WoW character comes back after a death (ServerPlayerMixin, sent on AFTER_RESPAWN):
+     * map < 0 = its hearthstone location, else the bed's spot (Minecraft position and yaw).
+     */
+    public static void queueRespawn(int map, net.minecraft.world.phys.Vec3 pos, float yaw) {
+        // REN_RESPAWN: u32 kind (0 home, 1 at), u32 map, f32 WoW x, y, z, o.
+        java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(24).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        if (map < 0) {
+            b.putInt(0).putInt(0).putFloat(0).putFloat(0).putFloat(0).putFloat(0);
+        } else {
+            b.putInt(1).putInt(map)
+                    .putFloat((float) (pos.z * BLOCKS_TO_YARDS)).putFloat((float) (pos.x * BLOCKS_TO_YARDS))
+                    .putFloat((float) (pos.y * BLOCKS_TO_YARDS)).putFloat((float) -Math.toRadians(yaw));
+        }
+        pendingRespawn = b.flip();
+    }
+
+    /** Respawns for benilla (REN_RESPAWN bodies). */
+    public static final java.util.concurrent.ConcurrentLinkedQueue<java.nio.ByteBuffer> RESPAWNS = new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     /** The player's WoW level/health from the last snapshot, or null. */
     public static McwowActors.Me me() {
@@ -204,6 +273,7 @@ public final class McwowCombat {
             removeAll();
             McwowActors.drainDamage(); // nothing to apply it to
             McwowActors.drainKills();
+            McwowActors.drainHarvests();
             return;
         }
         me = snapshot;
@@ -218,6 +288,7 @@ public final class McwowCombat {
         applyWowDamage(server, level);
         McwowXp.dropOrbs(level, McwowActors.drainXpDrops());
         McwowLoot.drop(level, McwowActors.drainKills());
+        net.mcwow.bridge.McwowNodes.confirm(server, level, McwowActors.drainHarvests());
         for (McwowActorEntity proxy : PROXIES.values()) {
             float[] hit = proxy.takeHit();
             if (hit != null) {
@@ -301,7 +372,11 @@ public final class McwowCombat {
             double y = a.z() / S;
             double z = a.x() / S + McwowGeomStore.regionOffsetZ;
             float yaw = (float) Math.toDegrees(-a.facing()); // WoW forward (cos f, sin f) in (X,Y) = MC (sin f, cos f) in (x,z)
-            float[] yd = McwowCreatureSizes.yards(a.displayId(), a.scale(), a.boundingRadius());
+            // The visible model's size from benilla (hitboxes, 2026-10-04: big WoW models drew far
+            // outside their collision box); WoW's collision size until the model has loaded.
+            float[] yd = a.modelHeight() > 0.05F && a.modelWidth() > 0.05F
+                    ? new float[] {a.modelHeight(), Math.max(a.modelWidth(), 0.4F)}
+                    : McwowCreatureSizes.yards(a.displayId(), a.scale(), a.boundingRadius());
             float h = yd[0] / S, w = yd[1] / S;
             McwowActorEntity proxy = PROXIES.get(a.guid());
             if (proxy == null) {
@@ -335,7 +410,7 @@ public final class McwowCombat {
     /** Client hook (set by the client initializer): applies knockback {power, xd, zd} to the local player. */
     public static volatile java.util.function.Consumer<double[]> clientKnockback;
 
-    /** Minecraft events for benilla: 1 = the player died, 2 = the player respawned. */
+    /** Minecraft events for benilla: 1 = the player died (respawns: RESPAWNS). */
     public static final java.util.concurrent.ConcurrentLinkedQueue<Integer> EVENTS = new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     /**
@@ -348,7 +423,11 @@ public final class McwowCombat {
         for (McwowActors.Damage d : McwowActors.drainDamage()) {
             McwowActorEntity attacker = PROXIES.get(d.attackerGuid());
             var sources = level.damageSources();
-            var source = attacker != null ? sources.mobAttack(attacker) : sources.generic();
+            // Spell hits (armor classes, 2026-10-04) are magic: vanilla armor ignores them; the
+            // player's spell protection cuts them below.
+            var source = attacker != null
+                    ? (d.spell() ? sources.indirectMagic(attacker, attacker) : sources.mobAttack(attacker))
+                    : (d.spell() ? sources.magic() : sources.generic());
             float damage = mcDamage(d.wowDamage(), d.attackerLevel());
             if (d.victimKind() == 1) {
                 if (level.getEntity(d.mcId()) instanceof LivingEntity mob && mob.isAlive()) {
@@ -365,7 +444,12 @@ public final class McwowCombat {
             if (!player.isAlive() || player.level() != level || player.isCreative() || player.isSpectator()) continue;
             // Gear (2026-10-03): armor's item level against the attacker's level.
             float armor = net.mcwow.bridge.McwowGear.armorFactor(player, d.attackerLevel());
-            damage *= armor;
+            damage *= armor * takenCurve(d.attackerLevel());
+            if (d.spell()) {
+                // Spell protection (cloth most, metal least) through vanilla's armor formula.
+                float[] sp = net.mcwow.bridge.McwowGear.spellProtection(player);
+                damage = net.minecraft.world.damagesource.CombatRules.getDamageAfterAbsorb(player, damage, source, sp[0], sp[1]);
+            }
             float healthBefore = player.getHealth();
             capturedKnockback = null;
             mirroring = true;
@@ -382,9 +466,10 @@ public final class McwowCombat {
             // Vanilla knocks back on a shield block too (dealDefaultKnockback runs with blocked=true;
             // only the hurt flash is skipped), and hurtServer reports a full block as "not hurt".
             if (kb != null && clientKnockback != null) clientKnockback.accept(kb);
-            LOGGER.info("mcwow-bridge: WoW hit the player for {} WoW damage (attacker lvl {}{}) = {} Minecraft damage (armor x{}) from {}: health {} -> {}{}",
-                    d.wowDamage(), d.attackerLevel(), d.crit() ? ", crit" : "", String.format("%.2f", damage),
-                    String.format("%.2f", armor),
+            LOGGER.info("mcwow-bridge: WoW hit the player for {} WoW damage (attacker lvl {}{}{}) = {} Minecraft damage (armor x{}, curve x{}) from {}: health {} -> {}{}",
+                    d.wowDamage(), d.attackerLevel(), d.crit() ? ", crit" : "", d.spell() ? ", spell school " + d.school() : "",
+                    String.format("%.2f", damage),
+                    String.format("%.2f", armor), String.format("%.2f", takenCurve(d.attackerLevel())),
                     attacker != null ? "creature entry " + attacker.entry() : "unknown source", healthBefore,
                     player.getHealth(), hurt ? "" : (player.isBlocking() ? " (shield)" : " (immune)"));
         }

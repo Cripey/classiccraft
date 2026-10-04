@@ -1,0 +1,12 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "mcwow:item/herb/silverleaf",
+    "tints": [
+      {
+        "type": "minecraft:constant",
+        "value": -4668212
+      }
+    ]
+  }
+}

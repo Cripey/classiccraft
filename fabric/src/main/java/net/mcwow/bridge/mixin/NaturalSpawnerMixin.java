@@ -18,6 +18,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * try landed in the void and nothing spawned. In a filled chunk the try is now a random column's
  * ground, bedrock to top block - caves, mines and dug pits - never the WoW surface above it (the
  * user's call: Minecraft mobs spawn underground only).
+ *
+ * The start is only where a pack begins: vanilla spreads its members up to 5 blocks sideways at the
+ * same height, which put them in the gap over a lower neighbour column's top block - under WoW's
+ * ground, and the buried rescue then lifted them onto it (2026-10-04, mobs on the surface near a dug
+ * cave). So every spawn position is checked too: feet at or under the column's top block.
  */
 @Mixin(NaturalSpawner.class)
 public abstract class NaturalSpawnerMixin {
@@ -43,5 +48,15 @@ public abstract class NaturalSpawnerMixin {
             pos = new BlockPos(chunk.getPos().getMinBlockX(), level.getMinY(), chunk.getPos().getMinBlockZ());
         }
         cir.setReturnValue(pos);
+    }
+
+    @Inject(method = "isValidSpawnPostitionForType", at = @At("HEAD"), cancellable = true)
+    private static void mcwow$notAboveGround(net.minecraft.server.level.ServerLevel level, net.minecraft.world.entity.MobCategory category,
+            net.minecraft.world.level.StructureManager structures, net.minecraft.world.level.chunk.ChunkGenerator generator,
+            net.minecraft.world.level.biome.MobSpawnSettings.SpawnerData data, BlockPos.MutableBlockPos pos, double distance,
+            CallbackInfoReturnable<Boolean> cir) {
+        if (net.mcwow.bridge.combat.McwowCombat.wowMapOf(level.dimension()) < 0) return;
+        int top = net.mcwow.bridge.McwowColumns.topOf(level, pos.getX(), pos.getZ());
+        if (top == McwowTerrainFill.NO_TOP || pos.getY() > top) cir.setReturnValue(false);
     }
 }

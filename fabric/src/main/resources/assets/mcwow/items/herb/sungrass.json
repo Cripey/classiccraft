@@ -1,0 +1,12 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "mcwow:item/herb/sungrass",
+    "tints": [
+      {
+        "type": "minecraft:constant",
+        "value": -2047936
+      }
+    ]
+  }
+}
