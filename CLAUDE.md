@@ -923,6 +923,10 @@ reference until classiccraft catches up.
    as fire DoT; benilla passes them as `CC_HIT_PERIODIC` 4 / `CC_HIT_SLOW` 8 / school bits; VMaNGOS `HandleCCHitOpcode`:
    school -> `CalculateDamageAbsorbAndResist`, immunity -> SPELL_MISS_IMMUNE, log as spell 5019 (Shoot), frost casts
    7321 (Chilled). Hits carry their weapon's item level (`source.getWeaponItem()`), ranged included.
+   Wands: `McwowWands` (WandItem per school, SpellBolt entity `mcwow:spell_bolt` rendered as the school's vanilla item
+   sprite + particles, `stamp` from the grid's bar via `McwowGear.stampCrafted`, `spellPower` = cloth bonus);
+   data from `tools/gen_mod_data.py weapons()` (textures, models, recipes `data/mcwow/recipe/wand/`, tag
+   `#mcwow:wand_metals`, names, spell death messages).
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.

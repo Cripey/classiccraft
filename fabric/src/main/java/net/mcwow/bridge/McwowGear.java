@@ -198,6 +198,17 @@ public final class McwowGear {
 
     /** ShapedRecipeMixin: a crafted piece takes the material that lay in the grid. */
     public static void stampCrafted(ItemStack result, CraftingInput input) {
+        if (result.getItem() instanceof McwowWands.WandItem) {
+            // A wand (2026-10-04): the bar in the grid is its material.
+            for (ItemStack in : input.items()) {
+                String mat = in.isEmpty() ? null : BY_INGREDIENT.get(in.getItem());
+                if (mat != null && MATERIALS.get(mat).toolTwin() != null) {
+                    McwowWands.stamp(result, MATERIALS.get(mat));
+                    return;
+                }
+            }
+            return;
+        }
         String piece = piece(result.getItem());
         if (piece == null) return;
         String mat = null;

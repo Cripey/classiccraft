@@ -169,6 +169,68 @@ def speck_overlay(ore, shades):
     png(f"assets/mcwow/textures/block/{ore}_ore_overlay.png", 16, 16, px)
 
 
+# Wands (McwowWands, 2026-10-04): one per spell school; catalyst over a metal bar over a stick.
+WAND_SCHOOLS = {  # school: (name, gem colour, catalyst)
+    "holy": ("Holy", (0xFF, 0xF2, 0xA0), "minecraft:glowstone_dust"),
+    "fire": ("Fire", (0xFF, 0x7A, 0x20), "minecraft:blaze_powder"),
+    "nature": ("Nature", (0x60, 0xD0, 0x40), "minecraft:slime_ball"),
+    "frost": ("Frost", (0x9A, 0xD8, 0xFF), "minecraft:snowball"),
+    "shadow": ("Shadow", (0x5A, 0x24, 0x80), "minecraft:ink_sac"),
+    "arcane": ("Arcane", (0xFF, 0x78, 0xE8), "minecraft:lapis_lazuli"),
+}
+WAND_METALS = ["minecraft:copper_ingot", "minecraft:gold_ingot", "mcwow:bronze_bar", "minecraft:iron_ingot",
+               "mcwow:steel_bar", "mcwow:mithril_bar", "mcwow:thorium_bar", "mcwow:dark_iron_bar"]
+
+
+def shade(c, f):
+    return tuple(max(0, min(255, int(v * f))) for v in c)
+
+
+def wand_texture(school, gem):
+    """Our own 16x16 wand: a wooden shaft from the bottom left, a grip wrap, a metal band and a
+    glowing gem in the school's colour at the top right."""
+    px = [0] * (16 * 16 * 4)
+    def put(x, y, c, a=255):
+        if 0 <= x < 16 and 0 <= y < 16:
+            px[(y * 16 + x) * 4:(y * 16 + x) * 4 + 4] = [*c, a]
+    wood, wood_hi, wood_lo = (0x7A, 0x52, 0x30), (0x9C, 0x6C, 0x40), (0x4E, 0x32, 0x1C)
+    for i in range(10):
+        x, y = 2 + i, 13 - i
+        grip = i <= 2
+        put(x, y, (0x3A, 0x28, 0x1E) if grip else wood)
+        put(x + 1, y, (0x2A, 0x1C, 0x14) if grip else wood_lo)  # shadow side
+        put(x, y - 1, (0x50, 0x3A, 0x2A) if grip else wood_hi) if i < 9 else None
+    for x, y in ((9, 6), (10, 6), (9, 5)):  # metal band under the gem
+        put(x, y, (0xB8, 0xBE, 0xC6))
+    put(10, 5, (0x80, 0x86, 0x8E))
+    for x, y in ((12, 3), (11, 4)):  # glow around the gem
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (1, -1), (-1, 1)):
+            put(x + dx, y + dy, gem, 90)
+    for x, y in ((11, 3), (12, 3), (11, 4), (12, 4)):
+        put(x, y, shade(gem, 0.8))
+    put(11, 3, shade(gem, 1.25))
+    put(12, 4, shade(gem, 0.55))
+    png(f"assets/mcwow/textures/item/{school}_wand.png", 16, 16, px)
+
+
+def weapons(lang):
+    write("data/mcwow/tags/item/wand_metals.json", {"replace": False, "values": WAND_METALS})
+    for school, (name, gem, catalyst) in WAND_SCHOOLS.items():
+        wid = f"{school}_wand"
+        wand_texture(school, gem)
+        write(f"assets/mcwow/models/item/{wid}.json", {"parent": "minecraft:item/handheld",
+                                                       "textures": {"layer0": f"mcwow:item/{wid}"}})
+        write(f"assets/mcwow/items/{wid}.json", {"model": {"type": "minecraft:model", "model": f"mcwow:item/{wid}"}})
+        lang[f"item.mcwow.{wid}"] = f"Wand of {name}"
+        write(f"data/mcwow/recipe/wand/{wid}.json", {
+            "type": "minecraft:crafting_shaped", "category": "equipment",
+            "pattern": ["C", "M", "S"],
+            "key": {"C": catalyst, "M": "#mcwow:wand_metals", "S": "minecraft:stick"},
+            "result": {"id": f"mcwow:{wid}"}})
+        lang[f"death.attack.mcwow.spell_{school}"] = f"%1$s was slain by {name.lower()} magic"
+        lang[f"death.attack.mcwow.spell_{school}.player"] = f"%1$s was slain by %2$s's {name.lower()} magic"
+
+
 def main():
     lang_path = os.path.join(RES, "assets/mcwow/lang/en_us.json")
     lang = json.load(open(lang_path))
@@ -230,6 +292,7 @@ def main():
     for tool, ids in by_tool.items():
         tag(f"data/minecraft/tags/block/{TOOL_TAG[tool]}.json", ids)
 
+    weapons(lang)
     with open(lang_path, "w") as f:
         json.dump(lang, f, indent=2)
         f.write("\n")

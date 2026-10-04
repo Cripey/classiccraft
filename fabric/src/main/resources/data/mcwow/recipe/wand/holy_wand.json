@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "C",
+    "M",
+    "S"
+  ],
+  "key": {
+    "C": "minecraft:glowstone_dust",
+    "M": "#mcwow:wand_metals",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "mcwow:holy_wand"
+  }
+}

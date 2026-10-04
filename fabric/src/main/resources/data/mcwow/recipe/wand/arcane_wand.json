@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "C",
+    "M",
+    "S"
+  ],
+  "key": {
+    "C": "minecraft:lapis_lazuli",
+    "M": "#mcwow:wand_metals",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "mcwow:arcane_wand"
+  }
+}
