@@ -1,0 +1,104 @@
+// mcwow bridge - Minecraft (Fabric) side of the architecture pivot.
+//
+// Phase 0 scope only: a client-only mod that reads the shared file
+// protocol/mcwow_protocol.h describes and logs what it sees, proving the real Fabric/Loom
+// toolchain can build and run against it - fabric/prototype/McwowBridgeTestReader.java already
+// proved the plain-Java read path works; this wires the same read into an actual mod.
+//
+// Structure follows FabricMC/fabric-example-mod's own `26.3` branch (fetched live 2026-09-30 -
+// the single most authoritative reference for this exact Minecraft version, more so than any
+// older/generic Fabric tutorial), not a generic template: no `mappings` block (MC 26.x ships
+// unobfuscated - confirmed separately by Yarn having zero published mappings for 26.3), plain
+// `implementation` (not `modImplementation`) for loader/API, and Java 25.
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+repositories {
+	mavenCentral()
+	// Loom adds the essential Minecraft/Fabric/Mojang repositories automatically.
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	runs {
+		// Headless dedicated server in build/datacheck (no window, not the user's run dir): loads
+		// the mod's data packs (worldgen, recipes, loot) so their errors show offline.
+		datacheck {
+			server()
+			name "Data check"
+			runDir "build/datacheck"
+			programArgs "--nogui" // run with -Pdatacheck, else the (client) mod isn't loaded
+		}
+	}
+
+	mods {
+		"mcwow-bridge" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// AzerothCore's character DB (instance binds -> per-instance Minecraft regions). Bundled
+	// jar-in-jar so the built mod is self-contained.
+	implementation "com.mysql:mysql-connector-j:9.4.0"
+	include "com.mysql:mysql-connector-j:9.4.0"
+}
+
+processResources {
+	def version = project.version
+	// -Pdatacheck: the mod also loads on a dedicated server (runDatacheck only; it's a client mod).
+	def environment = project.hasProperty("datacheck") ? "*" : "client"
+	inputs.property "version", version
+	inputs.property "environment", environment
+	filesMatching("fabric.mod.json") {
+		expand "version": version, "environment": environment
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+// Hardware OpenGL for Minecraft (2026-10-01). This shell is a distrobox: the NVIDIA device nodes
+// are passed through, but the container has no NVIDIA user-space GL, so Mesa fell back to
+// llvmpipe - Minecraft rendered 2560x1440 on the CPU at ~970% CPU (22 llvmpipe threads), slowing
+// WoW down everywhere. The host's own driver libraries (/run/host/usr/lib, only need glibc <= 2.10)
+// work here as-is: link them into run/nvidia-libs on every launch (survives host driver updates)
+// and point glvnd at them. Verified with glxinfo: "NVIDIA GeForce RTX 5070 Ti, 4.6.0 NVIDIA".
+tasks.matching { it.name == 'runClient' }.configureEach { task ->
+	task.doFirst {
+		def hostLib = new File('/run/host/usr/lib')
+		if (!new File(hostLib, 'libGLX_nvidia.so.0').exists()) {
+			logger.lifecycle('mcwow: no host NVIDIA GL libraries - Minecraft uses the default (Mesa) driver')
+			return
+		}
+		def dir = new File(project.projectDir, 'run/nvidia-libs')
+		dir.deleteDir()
+		dir.mkdirs()
+		hostLib.listFiles().findAll {
+			it.name ==~ /lib(GLX_nvidia|EGL_nvidia)\.so\.0/ || it.name ==~ /libnvidia-.*\.so\.[0-9.]+/
+		}.each {
+			java.nio.file.Files.createSymbolicLink(new File(dir, it.name).toPath(), it.toPath())
+		}
+		task.environment('__GLX_VENDOR_LIBRARY_NAME', 'nvidia')
+		task.environment('LD_LIBRARY_PATH', dir.absolutePath)
+		// GLFW picks Wayland (EGL) when WAYLAND_DISPLAY is set, and the container's EGL vendor list
+		// only has Mesa - first try still came up as "Mesa 26.0.8" with the NVIDIA libs loaded.
+		// X11 via XWayland (DISPLAY) uses GLX, which the glvnd variable above routes to NVIDIA.
+		task.environment.remove('WAYLAND_DISPLAY')
+		task.environment('XDG_SESSION_TYPE', 'x11')
+		logger.lifecycle("mcwow: Minecraft uses the host NVIDIA driver (${dir})")
+	}
+}

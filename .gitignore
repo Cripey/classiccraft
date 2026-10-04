@@ -1,0 +1,10 @@
+# Independent git repos (our forks), tracked separately
+/benilla/
+/vmangos/
+# Builds, extracted game data, DB dumps
+/build/
+/data/
+
+# Machine-specific settings (paths on this computer)
+/tools/local.env
+__pycache__/

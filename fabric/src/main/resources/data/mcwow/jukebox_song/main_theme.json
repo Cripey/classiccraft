@@ -1,0 +1,8 @@
+{
+  "comparator_output": 13,
+  "description": {
+    "translate": "jukebox_song.mcwow.main_theme"
+  },
+  "length_in_seconds": 161.3,
+  "sound_event": "mcwow:music_disc.main_theme"
+}

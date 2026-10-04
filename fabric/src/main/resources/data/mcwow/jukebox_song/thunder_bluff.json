@@ -1,0 +1,8 @@
+{
+  "comparator_output": 9,
+  "description": {
+    "translate": "jukebox_song.mcwow.thunder_bluff"
+  },
+  "length_in_seconds": 121.6,
+  "sound_event": "mcwow:music_disc.thunder_bluff"
+}

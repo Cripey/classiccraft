@@ -1,0 +1,17 @@
+Issues from from testing:
+- Dying and releasing spirit needs to be revisited.
+
+Change requests:
+- Right click on WoW anvils to bring up the Minecraft anvil weapon to allow the user to repair their weapons and armor.
+
+Ideas:
+- Gameplay should eventually only be done through Minecraft controls, only switching back to Wow controls if the user needs to debug or use GM commands.
+- World of Warcraft gameplay such as Quests, inventory (mainly for quest items), and surely others, should be translated into a form that is useable and rewarding for the Minecraft gameplay.
+- World of Warcraft and Minecraft are fundamentally very different systems. WoW is about grinding and gear progression. Minecraft does not have level progression, and resources are mined, items are crafted. The goal is to not lean too heavily on either of these systems, but not railroad the player either into using only MC or only WoW mechanics. The goal is to meld the two, and give the player good reason to do so. I want to retain the 1 - 60 level progression, quest rewards (translated into Minecraft appropriate rewards), as well as mining in the generated Mineraft caves, brainstorming is needed to strike a good balance, and new systems will need to be developed to achieve this most likely.
+- Rather than depending on Hearthstones and flight paths for travel, I would like the player to use Minecraft modes of travel such as Elytra, minecarts, potentially portal mods so that a player can link his bases to different places in the WoW world. World of Warcraft modes of travel such as zepplins, boats, and the Deeprun Tram are to be retained and made useable in "Minecraft Mode".
+- Down the road, I want to add items to Minecraft to allow the creation of new classes. Not rigid classes that are chosen and permanent, but determined by items. Staves, Wands, Bows, Swords, Axes, Shields and so on. Progression will need to be built into these, maybe having item levels like WoW, and level requirements. Extensive play testing will be needed at all level brackets and varieties of gameplay in order to tweak this to be most enjoyable to the player.
+- A goal is to have this project be accessible to solo players, but also playable in multiplayer with friends.
+- An NPC dialogue menu and quest log will need to be created in Minecraft to allow picking up quests, and selecting dialogue, accessing vendors. This is so that the player will not need to use WoW controls. Vendors may also have a Minecraft Mode specific inventory with items relevant to Minecraft gameplay, dependant on the level of the zone, and type of vendor.
+- Currency will need to be  in emeralds, or something else that can be tracked within the Minecraft inventory.
+- I would like XP and leveling to be tracked within Minecraft, mobs drop Minecraft XP orbs, with appropriate level scaling that is similar to Vanilla WoW, but also faster paced leveling. Quests may drop XP orbs around the player and/or drop XP potions to the player. Levels will have to be left untouched after dying in Minecraft.
+- - I would like to have death occur only in Minecraft, when the player dies, they respawn at their placed bed, or a default that might be determined by their starting location.

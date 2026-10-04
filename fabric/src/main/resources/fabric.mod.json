@@ -1,0 +1,30 @@
+{
+	"schemaVersion": 1,
+	"id": "mcwow-bridge",
+	"version": "${version}",
+	"name": "mcwow Bridge",
+	"description": "Phase 0 of bridging a real Minecraft client into WoW 3.3.5a. See CLAUDE.md 'Architecture pivot' in the azerothcore-mc project.",
+	"authors": [
+		"mcwow project"
+	],
+	"license": "MIT",
+	"environment": "${environment}",
+	"entrypoints": {
+		"main": [
+			"net.mcwow.bridge.McwowBridge"
+		],
+		"client": [
+			"net.mcwow.bridge.client.McwowBridgeClient"
+		]
+	},
+	"mixins": [
+		"mcwow.mixins.json",
+		{ "config": "mcwow.client.mixins.json", "environment": "client" }
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

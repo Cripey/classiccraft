@@ -1,0 +1,12 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "minecraft:item/raw_iron",
+    "tints": [
+      {
+        "type": "minecraft:constant",
+        "value": -990032
+      }
+    ]
+  }
+}

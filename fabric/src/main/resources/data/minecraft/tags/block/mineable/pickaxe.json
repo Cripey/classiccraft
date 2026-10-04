@@ -1,0 +1,18 @@
+{
+  "replace": false,
+  "values": [
+    "mcwow:waygate",
+    "mcwow:tin_ore",
+    "mcwow:deepslate_tin_ore",
+    "mcwow:silver_ore",
+    "mcwow:deepslate_silver_ore",
+    "mcwow:mithril_ore",
+    "mcwow:deepslate_mithril_ore",
+    "mcwow:truesilver_ore",
+    "mcwow:deepslate_truesilver_ore",
+    "mcwow:thorium_ore",
+    "mcwow:deepslate_thorium_ore",
+    "mcwow:dark_iron_ore",
+    "mcwow:deepslate_dark_iron_ore"
+  ]
+}

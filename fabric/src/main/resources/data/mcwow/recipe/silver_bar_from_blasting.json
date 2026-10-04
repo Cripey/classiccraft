@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:blasting",
+  "cookingtime": 100,
+  "experience": 0.7,
+  "group": "silver_bar",
+  "ingredient": "mcwow:raw_silver",
+  "result": {
+    "id": "mcwow:silver_bar"
+  }
+}

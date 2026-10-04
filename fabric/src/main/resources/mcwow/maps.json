@@ -1,0 +1,542 @@
+{
+ "0": {
+  "dir": "Azeroth",
+  "instanceType": 0
+ },
+ "1": {
+  "dir": "Kalimdor",
+  "instanceType": 0
+ },
+ "13": {
+  "dir": "test",
+  "instanceType": 0
+ },
+ "25": {
+  "dir": "ScottTest",
+  "instanceType": 0
+ },
+ "30": {
+  "dir": "PVPZone01",
+  "instanceType": 3
+ },
+ "33": {
+  "dir": "Shadowfang",
+  "instanceType": 1
+ },
+ "34": {
+  "dir": "StormwindJail",
+  "instanceType": 1
+ },
+ "35": {
+  "dir": "StormwindPrison",
+  "instanceType": 0
+ },
+ "36": {
+  "dir": "DeadminesInstance",
+  "instanceType": 1
+ },
+ "37": {
+  "dir": "PVPZone02",
+  "instanceType": 0
+ },
+ "42": {
+  "dir": "Collin",
+  "instanceType": 0
+ },
+ "43": {
+  "dir": "WailingCaverns",
+  "instanceType": 1
+ },
+ "44": {
+  "dir": "Monastery",
+  "instanceType": 1
+ },
+ "47": {
+  "dir": "RazorfenKraulInstance",
+  "instanceType": 1
+ },
+ "48": {
+  "dir": "Blackfathom",
+  "instanceType": 1
+ },
+ "70": {
+  "dir": "Uldaman",
+  "instanceType": 1
+ },
+ "90": {
+  "dir": "GnomeragonInstance",
+  "instanceType": 1
+ },
+ "109": {
+  "dir": "SunkenTemple",
+  "instanceType": 1
+ },
+ "129": {
+  "dir": "RazorfenDowns",
+  "instanceType": 1
+ },
+ "169": {
+  "dir": "EmeraldDream",
+  "instanceType": 2
+ },
+ "189": {
+  "dir": "MonasteryInstances",
+  "instanceType": 1
+ },
+ "209": {
+  "dir": "TanarisInstance",
+  "instanceType": 1
+ },
+ "229": {
+  "dir": "BlackRockSpire",
+  "instanceType": 1
+ },
+ "230": {
+  "dir": "BlackrockDepths",
+  "instanceType": 1
+ },
+ "249": {
+  "dir": "OnyxiaLairInstance",
+  "instanceType": 2
+ },
+ "269": {
+  "dir": "CavernsOfTime",
+  "instanceType": 1
+ },
+ "289": {
+  "dir": "SchoolofNecromancy",
+  "instanceType": 1
+ },
+ "309": {
+  "dir": "Zul'gurub",
+  "instanceType": 2
+ },
+ "329": {
+  "dir": "Stratholme",
+  "instanceType": 1
+ },
+ "349": {
+  "dir": "Mauradon",
+  "instanceType": 1
+ },
+ "369": {
+  "dir": "DeeprunTram",
+  "instanceType": 0
+ },
+ "389": {
+  "dir": "OrgrimmarInstance",
+  "instanceType": 1
+ },
+ "409": {
+  "dir": "MoltenCore",
+  "instanceType": 2
+ },
+ "429": {
+  "dir": "DireMaul",
+  "instanceType": 1
+ },
+ "449": {
+  "dir": "AlliancePVPBarracks",
+  "instanceType": 0
+ },
+ "450": {
+  "dir": "HordePVPBarracks",
+  "instanceType": 0
+ },
+ "451": {
+  "dir": "development",
+  "instanceType": 0
+ },
+ "469": {
+  "dir": "BlackwingLair",
+  "instanceType": 2
+ },
+ "489": {
+  "dir": "PVPZone03",
+  "instanceType": 3
+ },
+ "509": {
+  "dir": "AhnQiraj",
+  "instanceType": 2
+ },
+ "529": {
+  "dir": "PVPZone04",
+  "instanceType": 3
+ },
+ "530": {
+  "dir": "Expansion01",
+  "instanceType": 0
+ },
+ "531": {
+  "dir": "AhnQirajTemple",
+  "instanceType": 2
+ },
+ "532": {
+  "dir": "Karazahn",
+  "instanceType": 2
+ },
+ "533": {
+  "dir": "Stratholme Raid",
+  "instanceType": 2
+ },
+ "534": {
+  "dir": "HyjalPast",
+  "instanceType": 2
+ },
+ "540": {
+  "dir": "HellfireMilitary",
+  "instanceType": 1
+ },
+ "542": {
+  "dir": "HellfireDemon",
+  "instanceType": 1
+ },
+ "543": {
+  "dir": "HellfireRampart",
+  "instanceType": 1
+ },
+ "544": {
+  "dir": "HellfireRaid",
+  "instanceType": 2
+ },
+ "545": {
+  "dir": "CoilfangPumping",
+  "instanceType": 1
+ },
+ "546": {
+  "dir": "CoilfangMarsh",
+  "instanceType": 1
+ },
+ "547": {
+  "dir": "CoilfangDraenei",
+  "instanceType": 1
+ },
+ "548": {
+  "dir": "CoilfangRaid",
+  "instanceType": 2
+ },
+ "550": {
+  "dir": "TempestKeepRaid",
+  "instanceType": 2
+ },
+ "552": {
+  "dir": "TempestKeepArcane",
+  "instanceType": 1
+ },
+ "553": {
+  "dir": "TempestKeepAtrium",
+  "instanceType": 1
+ },
+ "554": {
+  "dir": "TempestKeepFactory",
+  "instanceType": 1
+ },
+ "555": {
+  "dir": "AuchindounShadow",
+  "instanceType": 1
+ },
+ "556": {
+  "dir": "AuchindounDemon",
+  "instanceType": 1
+ },
+ "557": {
+  "dir": "AuchindounEthereal",
+  "instanceType": 1
+ },
+ "558": {
+  "dir": "AuchindounDraenei",
+  "instanceType": 1
+ },
+ "559": {
+  "dir": "PVPZone05",
+  "instanceType": 4
+ },
+ "560": {
+  "dir": "HillsbradPast",
+  "instanceType": 1
+ },
+ "562": {
+  "dir": "bladesedgearena",
+  "instanceType": 4
+ },
+ "564": {
+  "dir": "BlackTemple",
+  "instanceType": 2
+ },
+ "565": {
+  "dir": "GruulsLair",
+  "instanceType": 2
+ },
+ "566": {
+  "dir": "NetherstormBG",
+  "instanceType": 3
+ },
+ "568": {
+  "dir": "ZulAman",
+  "instanceType": 2
+ },
+ "571": {
+  "dir": "Northrend",
+  "instanceType": 0
+ },
+ "572": {
+  "dir": "PVPLordaeron",
+  "instanceType": 4
+ },
+ "573": {
+  "dir": "ExteriorTest",
+  "instanceType": 0
+ },
+ "574": {
+  "dir": "Valgarde70",
+  "instanceType": 1
+ },
+ "575": {
+  "dir": "UtgardePinnacle",
+  "instanceType": 1
+ },
+ "576": {
+  "dir": "Nexus70",
+  "instanceType": 1
+ },
+ "578": {
+  "dir": "Nexus80",
+  "instanceType": 1
+ },
+ "580": {
+  "dir": "SunwellPlateau",
+  "instanceType": 2
+ },
+ "582": {
+  "dir": "Transport176244",
+  "instanceType": 0
+ },
+ "584": {
+  "dir": "Transport176231",
+  "instanceType": 0
+ },
+ "585": {
+  "dir": "Sunwell5ManFix",
+  "instanceType": 1
+ },
+ "586": {
+  "dir": "Transport181645",
+  "instanceType": 0
+ },
+ "587": {
+  "dir": "Transport177233",
+  "instanceType": 0
+ },
+ "588": {
+  "dir": "Transport176310",
+  "instanceType": 0
+ },
+ "589": {
+  "dir": "Transport175080",
+  "instanceType": 0
+ },
+ "590": {
+  "dir": "Transport176495",
+  "instanceType": 0
+ },
+ "591": {
+  "dir": "Transport164871",
+  "instanceType": 0
+ },
+ "592": {
+  "dir": "Transport186238",
+  "instanceType": 0
+ },
+ "593": {
+  "dir": "Transport20808",
+  "instanceType": 0
+ },
+ "594": {
+  "dir": "Transport187038",
+  "instanceType": 0
+ },
+ "595": {
+  "dir": "StratholmeCOT",
+  "instanceType": 1
+ },
+ "596": {
+  "dir": "Transport187263",
+  "instanceType": 0
+ },
+ "597": {
+  "dir": "CraigTest",
+  "instanceType": 0
+ },
+ "598": {
+  "dir": "Sunwell5Man",
+  "instanceType": 1
+ },
+ "599": {
+  "dir": "Ulduar70",
+  "instanceType": 1
+ },
+ "600": {
+  "dir": "DrakTheronKeep",
+  "instanceType": 1
+ },
+ "601": {
+  "dir": "Azjol_Uppercity",
+  "instanceType": 1
+ },
+ "602": {
+  "dir": "Ulduar80",
+  "instanceType": 1
+ },
+ "603": {
+  "dir": "UlduarRaid",
+  "instanceType": 2
+ },
+ "604": {
+  "dir": "GunDrak",
+  "instanceType": 1
+ },
+ "605": {
+  "dir": "development_nonweighted",
+  "instanceType": 0
+ },
+ "606": {
+  "dir": "QA_DVD",
+  "instanceType": 0
+ },
+ "607": {
+  "dir": "NorthrendBG",
+  "instanceType": 3
+ },
+ "608": {
+  "dir": "DalaranPrison",
+  "instanceType": 1
+ },
+ "609": {
+  "dir": "DeathKnightStart",
+  "instanceType": 0
+ },
+ "610": {
+  "dir": "Transport_Tirisfal _Vengeance_Landing",
+  "instanceType": 0
+ },
+ "612": {
+  "dir": "Transport_Menethil_Valgarde",
+  "instanceType": 0
+ },
+ "613": {
+  "dir": "Transport_Orgrimmar_Warsong_Hold",
+  "instanceType": 0
+ },
+ "614": {
+  "dir": "Transport_Stormwind_Valiance_Keep",
+  "instanceType": 0
+ },
+ "615": {
+  "dir": "ChamberOfAspectsBlack",
+  "instanceType": 2
+ },
+ "616": {
+  "dir": "NexusRaid",
+  "instanceType": 2
+ },
+ "617": {
+  "dir": "DalaranArena",
+  "instanceType": 4
+ },
+ "618": {
+  "dir": "OrgrimmarArena",
+  "instanceType": 4
+ },
+ "619": {
+  "dir": "Azjol_LowerCity",
+  "instanceType": 1
+ },
+ "620": {
+  "dir": "Transport_Moa'ki_Unu'pe",
+  "instanceType": 0
+ },
+ "621": {
+  "dir": "Transport_Moa'ki_Kamagua",
+  "instanceType": 0
+ },
+ "622": {
+  "dir": "Transport192241",
+  "instanceType": 0
+ },
+ "623": {
+  "dir": "Transport192242",
+  "instanceType": 0
+ },
+ "624": {
+  "dir": "WintergraspRaid",
+  "instanceType": 2
+ },
+ "628": {
+  "dir": "IsleofConquest",
+  "instanceType": 3
+ },
+ "631": {
+  "dir": "IcecrownCitadel",
+  "instanceType": 2
+ },
+ "632": {
+  "dir": "IcecrownCitadel5Man",
+  "instanceType": 1
+ },
+ "641": {
+  "dir": "Transport_AllianceAirshipBG",
+  "instanceType": 0
+ },
+ "642": {
+  "dir": "Transport_HordeAirshipBG",
+  "instanceType": 0
+ },
+ "647": {
+  "dir": "Transport_Orgrimmar_to_Thunderbluff",
+  "instanceType": 0
+ },
+ "649": {
+  "dir": "ArgentTournamentRaid",
+  "instanceType": 2
+ },
+ "650": {
+  "dir": "ArgentTournamentDungeon",
+  "instanceType": 1
+ },
+ "658": {
+  "dir": "QuarryofTears",
+  "instanceType": 1
+ },
+ "668": {
+  "dir": "HallsOfReflection",
+  "instanceType": 1
+ },
+ "672": {
+  "dir": "Transport197347",
+  "instanceType": 0
+ },
+ "673": {
+  "dir": "Transport197348",
+  "instanceType": 0
+ },
+ "712": {
+  "dir": "Transport197349",
+  "instanceType": 0
+ },
+ "713": {
+  "dir": "Transport197350",
+  "instanceType": 0
+ },
+ "718": {
+  "dir": "Transport201834",
+  "instanceType": 0
+ },
+ "723": {
+  "dir": "Stormwind",
+  "instanceType": 0
+ },
+ "724": {
+  "dir": "ChamberofAspectsRed",
+  "instanceType": 2
+ }
+}

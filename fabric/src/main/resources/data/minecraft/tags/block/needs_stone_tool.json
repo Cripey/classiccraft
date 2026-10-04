@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "mcwow:tin_ore",
+    "mcwow:deepslate_tin_ore",
+    "mcwow:silver_ore",
+    "mcwow:deepslate_silver_ore"
+  ]
+}

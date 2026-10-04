@@ -1,0 +1,42 @@
+{
+  "music_disc.tavern_alliance": {
+    "sounds": [
+      {
+        "name": "mcwow:wowmusic/tavern_alliance",
+        "stream": true
+      }
+    ]
+  },
+  "music_disc.sacred": {
+    "sounds": [
+      {
+        "name": "mcwow:wowmusic/sacred",
+        "stream": true
+      }
+    ]
+  },
+  "music_disc.main_theme": {
+    "sounds": [
+      {
+        "name": "mcwow:wowmusic/main_theme",
+        "stream": true
+      }
+    ]
+  },
+  "music_disc.thunder_bluff": {
+    "sounds": [
+      {
+        "name": "mcwow:wowmusic/thunder_bluff",
+        "stream": true
+      }
+    ]
+  },
+  "waygate.teleport": {
+    "sounds": [
+      {
+        "name": "mcwow:wowmusic/waygate_teleport",
+        "stream": true
+      }
+    ]
+  }
+}

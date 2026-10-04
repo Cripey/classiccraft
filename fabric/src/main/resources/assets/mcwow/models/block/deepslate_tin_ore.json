@@ -1,0 +1,7 @@
+{
+  "parent": "mcwow:block/ore",
+  "textures": {
+    "base": "minecraft:block/deepslate",
+    "ore": "mcwow:block/tin_ore_overlay"
+  }
+}

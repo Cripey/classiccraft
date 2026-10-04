@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "X": "mcwow:dark_iron_bar"
+  },
+  "pattern": [
+    "X X",
+    "X X"
+  ],
+  "result": {
+    "id": "minecraft:netherite_boots"
+  },
+  "group": "mcwow_boots"
+}

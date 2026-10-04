@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:copper_ingot",
+    "mcwow:tin_bar"
+  ],
+  "result": {
+    "id": "mcwow:bronze_bar",
+    "count": 2
+  }
+}

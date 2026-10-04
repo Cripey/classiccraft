@@ -1,0 +1,12 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "minecraft:item/leather",
+    "tints": [
+      {
+        "type": "minecraft:constant",
+        "value": -9676728
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "OEO",
+    "GAG",
+    "OOO"
+  ],
+  "key": {
+    "O": "minecraft:obsidian",
+    "E": "minecraft:ender_eye",
+    "G": "minecraft:gold_ingot",
+    "A": "minecraft:amethyst_shard"
+  },
+  "result": {
+    "id": "mcwow:waygate",
+    "count": 1
+  }
+}

@@ -1,0 +1,763 @@
+# classiccraft — a real Minecraft client bridged into vanilla WoW (1.12.1)
+
+## Premise (decided 2026-10-02)
+Play World of Warcraft 1.12.1 as if you were a Minecraft player. A real, unmodified Minecraft
+Java client runs alongside a **fork of an open-source WoW client** and is bridged to it: Minecraft
+is authoritative for the local player's physics, camera, inventory, crafting, blocks and combat
+maths; WoW keeps its own world, quests, NPCs and server. Minecraft's blocks, entities, hand and
+HUD are drawn into WoW's frame, depth-tested against WoW's world.
+
+This is the successor to **mcwow** (`../azerothcore-mc/`, a sibling directory),
+which does the same thing against the official Blizzard 3.3.5a client under Wine with an
+injected DLL. mcwow works (camera, puppet, collision, overlay, blocks, combat), but every WoW-side
+piece is a hack around a closed binary: hardcoded build-12340 addresses, inline hooks, D3D9
+depth-buffer tricks, hand-built movement packets, GM chat commands for damage. classiccraft
+replaces the closed client with one whose source we own. mcwow stays untouched as the working
+reference until classiccraft catches up.
+
+### The three pieces
+| Piece | What | Why |
+|---|---|---|
+| WoW client | Fork of **benilla** (github.com/samwhosung/benilla) — a from-scratch 1.12.1 client in Rust + Bevy 0.18 / wgpu 27, MIT/Apache | Most complete open client (whole game, stock FrameXML + addons), native Linux, actively developed. Camera, player model, movement, rendering and packets become ordinary code we edit. |
+| Server | **VMaNGOS** (github.com/vmangos/core) | benilla's own reference server (Warden off by default). Native Linux build. Purpose-built for this project — server changes are allowed. |
+| Minecraft | Real Minecraft Java client + our Fabric mod, ported from mcwow's `fabric/` | Authenticity: real MC physics, blocks, crafting, mobs. **Not** reimplemented in Rust. |
+
+### Decisions and why
+- **Open client over the official one**: the user wants the freedom of editing the client; the
+  hacks in mcwow were the cost of a closed binary.
+- **Vanilla over WotLK**: user doesn't mind losing WotLK content; benilla (1.12.1) is a much more
+  complete client than the 3.3.5a alternatives (WoWee is C++/Vulkan and rougher; WowRust is early).
+- **Server changes allowed**: mcwow avoided them only to stay plug-and-play with any AzerothCore
+  repack on the official client. That goal doesn't apply with a custom client. Use custom opcodes
+  / server code instead of GM-command workarounds (e.g. a "Minecraft hit creature X for N, crit"
+  packet instead of `.damage`; server-side damage from a named source instead of `.cast self`
+  tricks; server-forwarded incoming hits instead of inflating HP to 10,000,000).
+- **Bots don't matter**: AzerothCore+playerbots and CMaNGOS were just the user's normal play
+  servers, not requirements.
+- **Keep the bridge**: Minecraft stays a separate real client connected over shared memory.
+
+## Repo layout
+- `classiccraft/` — top-level git repo: our own code (Fabric mod, protocol, tools, docs).
+- `benilla/`, `vmangos/` — independent clones, gitignored by the top-level repo. Remotes:
+  `origin` = our public GitHub forks (Cripey/benilla-classiccraft, Cripey/VMaNGOS-classiccraft),
+  `upstream` = original project. Our work lives on branch `classiccraft`; the fork's default branch
+  (`main` / `development`) stays an upstream mirror. Pull upstream fixes by hand when needed
+  (fork drift is accepted).
+- `build/`, `data/` — gitignored: build outputs, extracted WoW data, DB dumps.
+
+## Environment
+- Claude Code runs inside an Ubuntu 26.04 distrobox (see mcwow's CLAUDE.md "Environment"):
+  `apt` with passwordless sudo, OpenJDK 25, `/dev/shm` shared with the host, `DISPLAY=:1`.
+  Host GPU: RTX 5070 Ti, NVIDIA driver 610.57.04, i9-12900K (24 threads), 31 GB RAM.
+- Everything runs inside the distrobox (no Docker). Installed 2026-10-02: rustup (`~/.cargo`;
+  benilla pins its toolchain in `rust-toolchain.toml`), build-essential, cmake, clang, pkg-config,
+  ALSA/udev/OpenSSL/zlib dev packages, MariaDB 11.8 server + `libmariadb-dev`.
+- **MariaDB runs on port 3307**, not 3306: mcwow's AzerothCore repack runs a Wine `mysqld.exe` on
+  3306 and the distrobox shares the host network. Config: `/etc/mysql/mariadb.conf.d/60-classiccraft.cnf`.
+  No systemd in the box — start/stop with `tools/db.sh start|stop|status`. Datadir `/var/lib/mariadb`.
+- **Ports** (mcwow's AzerothCore repack holds 3306/3724/8085 on the shared host network, so
+  classiccraft uses its own): MariaDB **3307**, realmd **3725**, mangosd **8086**. All bound to
+  127.0.0.1. The stock VMaNGOS configs point at 3306 — never use them unedited.
+- **benilla runs on the host, not in the distrobox.** Inside the box wgpu's device creation fails
+  on the passed-through NVIDIA driver (`RequestDeviceError Device(Lost)`), though `vkcube` works
+  with `tools/nvidia-env.sh`. The same binary runs natively on the host via `distrobox-host-exec`
+  (verified 2026-10-02: login, char create, world entry). Build in the box, run on the host.
+  On Wayland, winit logs "could not set cursor position" — watch mouselook.
+- 1.12.1 client (5875 enUS, verified): path in `WOW_CLIENT` (set in the gitignored `tools/local.env`,
+  read by `tools/play.sh` / `tools/minecraft.sh`) — NTFS/OneDrive, **read only, never write into it**. Has a non-stock
+  `patch-2.MPQ` (9 MB); first suspect if benilla's visuals look off.
+
+## Build / run
+- Day to day: `tools/db.sh start`, `tools/server.sh start|stop|status|log|cmd "<GM command>"`,
+  `WOW_USER=player WOW_PASS=player tools/play.sh`. Accounts (GM 3): `player`/`player` for the user,
+  `probe1`/`probe1` for scripted runs (char `Probeone`, human warrior). Unattended login test:
+  `WOW_USER=probe1 WOW_PASS=probe1 WOW_CHAR=Probeone WOW_UNATTENDED=1 WOW_NOSOUND=1
+  WOW_PROBE_EXIT_AT=40 tools/play.sh` (switches: benilla `docs/CONTRIBUTING.md`).
+- benilla: profiles `dev` (deps opt-3, own crates opt-1), `play` (release + incremental), `ship`
+  (fat LTO). Clean `cargo build --profile play -p benilla` = 4m31s. Binary `benilla/target/play/benilla`.
+- VMaNGOS: `cmake -S vmangos -B build/vmangos -DCMAKE_BUILD_TYPE=Release -DBUILD_EXTRACTORS=ON
+  -DCMAKE_INSTALL_PREFIX=$PWD/build/vmangos-run && cmake --build build/vmangos -j 12 &&
+  cmake --install build/vmangos` (clean 1m58s). Live configs: `build/vmangos-run/etc/{mangosd,realmd}.conf`
+  (generated from `.dist` with the ports above, `DataDir`=`data/server`, `LogsDir`=`data/run/logs`).
+- Server data: `tools/extract.sh "<client dir>"` -> `data/server/{5875/dbc,maps,vmaps,mmaps}`
+  (~15 min total incl. mmaps on 20 threads). mangosd wants DBCs under `<DataDir>/5875/dbc`.
+- World DB: VMaNGOS `db_latest` release (`db-4641790.zip`, in `data/db/`), imported into
+  `mangos`/`characters`/`realmd`/`logs`, user `mangos`/`mangos`. Matches our source commit, no
+  migrations needed. Realm `classiccraft` id 1. Logs: `build/logs/` (builds), `data/run/` (servers).
+
+## Plan
+1. ~~Prerequisites~~ — done 2026-10-02.
+2. ~~VMaNGOS built natively, data extracted, DB imported, account created~~ — done 2026-10-02.
+3. ~~Stock benilla builds, logs in, plays~~ — done 2026-10-02 (runs on the host, see Environment).
+4. **Phase 1 in the fork** — DONE, user-confirmed live 2026-10-02 ("flawless"). Pieces:
+   - `benilla/crates/benilla-app/src/player/external.rs` + 5 marked edits in `player/controller.rs`
+     (`// classiccraft:`): an `ExternalDrive` pose replaces the keyboard axes, `mover::step` and the
+     camera seat; flags/gait/`movement_net` run unchanged, so the server gets real `MSG_MOVE_*`
+     (start/stop, jump, fall-land, heartbeat). A server move between driven frames yields the
+     body and bumps `ExternalDrive::server_moves`. `SelfReport` publishes the body after `control`.
+   - `benilla/crates/classiccraft/` (binary `classiccraft`, `run_with`): `shm.rs` (protocol v3
+     mirror), `bridge.rs` (placement handshake on world entry / map change / server move /
+     Numpad+, ground 5x5 grid via `WorldCollision::ray_body`, Minecraft FOV onto `WorldCamera`),
+     `input.rs` (benilla window keeps focus; keys -> SDL scancodes, buttons, raw motion, wheel into
+     the overlay file's input ring; benilla's own input cleared; ` = WoW UI mode, Numpad+ = bridge).
+   - `fabric/` = mcwow's mod copied; protocol v3 (`protocol/mcwow_protocol.h`: + onGround, inWater,
+     velocity blocks/s, FOV; 260 bytes), retries opening the bridge file, DB defaults -> VMaNGOS.
+   - All shm files renamed `/dev/shm/classiccraft_*` so mcwow can run alongside.
+   - `geom.rs` replaces geom_server: benilla's own body-filter colliders (`faces_near_body`,
+     `FaceProbe::verts` made `pub` in benilla-world) cut into 32 yd cells, 5x5 cells around the
+     player, resent on `ColliderEpoch` change when the triangles differ, eviction/refresh honoured.
+     The mod's collider uses ONLY these triangles (the 5x5 ground grid is published but unused).
+     First live run: 45 cells, ~31k triangles near Northshire.
+   - The mod ignores WoW data whose heartbeat stopped (stale file once dropped Steve into the void).
+5. **Overlay + world rendering** — DONE, user-confirmed 2026-10-02:
+   - `classiccraft/src/overlay.rs`: MC hand/HUD/screens from the overlay triple buffer as a
+     full-window `ImageNode` (GlobalZIndex 850), `Rgba8UnormSrgb` (benilla's Bevy-UI shader decodes
+     then re-encodes), un-premultiplied. While a MC screen is open the cursor is freed and
+     `IN_CURSOR` sent in MC framebuffer px; key auto-repeat is dropped; typed text from `ev.text`.
+   - `classiccraft/src/render.rs`: reads `classiccraft_render_v1.shm` (MC stops drawing its level
+     while we read): atlas/sections/entity textures/scene+avatar meshes drawn with benilla's own
+     `WowModelMaterial` via `model_material` (WoW sun/ambient/fog, depth vs WoW), one-sided (MC
+     sends both faces of plants; two-sided z-fought). MC lights -> `WorldPointLight`s (light WoW too);
+     fork shader bit `clutter_fade.z` 14 anchors point-light choice per vertex for MC meshes.
+   - Fork hooks added since Phase 1: `in_world` waits for the loading cover (placement over
+     unloaded terrain dropped Steve under the map); placement seq seeded per session; undriven
+     frames reset `applied`; under a server ride (taxi) the camera rides the body with MC's look;
+     FALLING_FAR + fall clock >1229 ms stripped from the wire while MC drives (no WoW fall damage);
+     WoW body always hidden while MC drives (Steve is the avatar). Mod: fall distance reset on
+     placement.
+   - Parked (user, 2026-10-02): death sync (WoW death doesn't kill Steve; revisit with combat),
+     WoW water vs MC (built and parked, see step 10), Steve invisible during taxi rides.
+   - `GM.CheatGod = 1`: GM characters are immortal at login; `.cheat god off` to test death.
+   - Run MC from the user's own terminal (`tools/minecraft.sh`): background tasks here get killed.
+   - Run: `tools/minecraft.sh` (load a Void world) + `tools/play.sh`; dump: `tools/shmdump.py`.
+6. **Combat crossover** — DONE, user-confirmed 2026-10-02 (Steve vs WoW creatures, MC mobs vs
+   WoW creatures incl. friendly NPCs, tamed wolves). Design: Minecraft owns the player's and MC
+   mobs' health, the server owns creatures'.
+   - VMaNGOS fork: `src/game/ClassicCraft.h` + `Handlers/ClassicCraftHandler.cpp`; opcodes 828-832
+     (`CMSG_CC_HELLO/HIT/ACTORS/DIED`, `SMSG_CC_DAMAGE`); hooks marked `classiccraft` in
+     `Unit::DealDamage` (bridged player / proxy victims: hit forwarded, health untouched),
+     `WorldObject::GetReactionTo` (proxy hostility), `Player::RemoveFromWorld` + `LogoutPlayer`
+     (proxy cleanup). Proxies = creature_template 990001 hostile / 990002 passive / 990003
+     companion (`sql/custom/classiccraft_proxies.sql`, invisible display 11686, NullAI).
+   - benilla fork: `benilla-protocol` opcode consts + `ServerPacket/SessionEvent::ClassicCraft` +
+     `WorldWriter::send_classiccraft`; `external.rs` `CustomPacketOut/In` messages and
+     `NearbyUnits` (creatures with `CanAttack`). classiccraft crate `combat.rs` routes it all.
+   - shm: actors file v2 (`classiccraft_actors_v1.shm`, + damage ring); render ring `REN_HIT` 24 B
+     with attacker id, new `REN_MOBS` (12). Mod: stand-ins for every creature (`attackable` gates
+     the player's own hits), per-attacker hits, `applyWowDamage`, mob export 5 Hz; tuning
+     `combatgain=` / `takengain=` in `/dev/shm/classiccraft_combat`. Damage scale: 20 MC damage =
+     a typical creature's health at the relevant level (player hits: player level).
+   - Death: MC death -> `CMSG_CC_DIED` (server lifts god mode for the kill); MC respawn -> repop.
+     User-confirmed live 2026-10-02.
+   - Pet follow-teleports snap to WoW ground and clear fall distance (`TamableTeleportMixin`).
+   - Since: ghost mode (WoW dead/ghost -> Steve invulnerable, invisible, adventure if survival,
+     melee cancelled `PlayerGhostMixin`; benilla sends no hits/proxies, HELLO off); companion
+     proxies react as their owner (`ReactionOverride`, so WoW mobs can target the player's wolf);
+     stand-in table survives a raced read; bridged players get no WoW auto-attack
+     (`Unit::DealDamage`); knockback applied on shield blocks too (vanilla: a full block gives the
+     blocker none, only the attacker - user declined pushing WoW creatures back);
+     `takengain` default 2.5 (user's choice).
+7. **Combat follow-ups** - all user-confirmed live 2026-10-02:
+   - Shield durability on blocked WoW hits works (hits >= 3.0 wear it - vanilla).
+   - No WoW auto-attack for bridged players; death -> ghost run and ghost mode work.
+   - Companion proxies (tamed wolves): `UNIT_FLAG_PLAYER_CONTROLLED` like a hunter pet, so NEUTRAL
+     creatures turn on them too (creature-vs-creature needs one side hostile). All proxies use
+     `ClassicCraftProxyAI` (never moves; leaves combat in place - NullAI evaded and walked off) and
+     any movement generator is cleared on each CMSG_CC_ACTORS update. Despawned with `UnSummon`
+     (ForcedDespawn only killed the summon, which lingered and respawned). mangosd logs
+     `[classiccraft] proxy ... spawned/despawn`.
+   - Proxies hidden from the player: benilla ORs UNIT_FLAG_NOT_SELECTABLE into incoming fields of
+     the creature entries the classiccraft crate registers (`external::set_unselectable_entries` /
+     `mask_unselectable`, hooked in `net.rs merge_store_fields` and the create path in
+     `net/objects.rs`) - no nameplate/target; the server keeps them selectable.
+   - MC mob pathing: `GroundPathNavigationMixin` snaps entity path targets onto WoW ground (vanilla
+     `findSurfacePosition` sent them to the build limit, y=1536 - mobs stood still at slopes);
+     `LeapAtTargetGoalMixin` turns a leaper to its target (wolves leapt backwards).
+8. **Breakable terrain** (decisions: project memory `terrain-voxel-design`) - Phases 1-3 DONE and
+   user-confirmed 2026-10-02 (Phase 4, no digging in cities, not started).
+   - **Fill (Phase 1).** benilla crate `terrain.rs` sends per MC chunk within 6 of the body, per
+     block column: lowest WoW surface (3x3 samples; a no-ground sample is retried 0.01 yd to each
+     side - MCNK-edge rounding), a fill ceiling lowered under collision faces > 0.75 yd below the
+     terrain (cellars, mines), the dominant ground texture's material, the AreaTable id - over the
+     geom ring as `MSG_TERRAIN` (4) once tiles are resident 3 s and colliders settled 1 s
+     (`TerrainStreamer::tile_handle` added to benilla). Mod `McwowTerrainStore` + `McwowTerrainFill`
+     fill loaded chunks nearest-first (15 ms/tick, max 4 chunks/tick) from 0.05 under the surface
+     down 48 blocks (surface layers by material, stone, deepslate from 24, hashed ore veins,
+     simplex caves - tunnels ~6%, caverns ~2.7%, 6-block crust, 2 over bedrock), bedrock below;
+     never replace blocks. setBlock WITHOUT client updates (1.25M per-block updates froze the MC
+     client); each chunk is resent whole after its light settles, plus its 8 neighbours' light
+     (else caves kept stale daylight on the client). Chunk attachments: `mcwow:wow_ground_tops`
+     (int[256] top block per column, NO_TOP = none; persistent, synced to clients - THE truth for
+     a column's top; never recompute it) and `mcwow:wow_ground_filled`. Filled chunks get a real
+     biome (snowy_plains/desert/plains - the void biome has no spawns). Once per chunk per session
+     `repair` fills NO_TOP columns that have terrain data and clears weather snow layers.
+   - **Digging (Phase 2).** `McwowColumns` (main, client+server): a column is OPEN when its top block
+     isn't natural ground (dirt/sand/stone tags, grass, gravel, snow block, cobblestone...) or
+     something with collision is in the gap cell above it (a stair one up); ground put back
+     closes it, built blocks keep it open. Mod `McwowHoleExporter` sends `REN_HOLES` (13: i32 cx, cz
+     + 8 u32 mask) per chunk on change; `McwowTargeting` aims an upward WoW-ground hit at the real
+     block <= 3 below. benilla fork module `benilla-world/src/terrain_holes.rs` (`TerrainHoles`
+     32x32-chunk window, storage buffer binding 120 on `TerrainExtension`, `terrain.wgsl`
+     `in_open_column` discard) + crate `holes.rs` (masks, window); crate `geom.rs` clips open
+     columns out of terrain faces (all corners on the heightfield, checked 1% toward the centroid)
+     and resends cells over changed chunks. Hole walls ("skirts", SkyCraft's dig-hole walls) in
+     `McwowWorldExporter.addSkirts`: per closed column next to an open one, a strip from its top
+     block up to the WoW ground (`McwowTriHeight.lowestSurface`, 8 segments per edge, sampled
+     0.002 inside the closed cell, <= 8 blocks, 1-block bands: side texture on top, body texture
+     below); re-meshed when columns open/close and whenever a geom cell arrives while holes exist.
+     A closed column's top block draws its sides in its body texture (`fillSprite`, tinted overlay
+     dropped; `MeshBuilder.buriedSides`): a grass block showed a second fringe a block under the
+     wall's (2026-10-02, Duskwood).
+     `McwowColumns.isNaturalGround` includes `BlockTags.MUD`: in 26.3 mud left the DIRT tag, so every
+     Soggy-ground (MUD) column read as dug and WoW's terrain was cut over whole areas (Tirisfal).
+     `BlockCollisionsMixin`: smooth-collider players ignore a closed column's top block while their
+     feet are within 0.75 of its top (it was an invisible one-way wall on slopes).
+     WoW ground clutter (grass tufts) over a dug column is not built (user, 2026-10-02: it floated
+     over holes): fork `terrain_holes::TerrainHoles::is_open_wow` (CPU twin of the shader test) +
+     `changed` chunks per rebuild; `clutter.rs` skips those tufts and re-cuts only the clutter chunks
+     over changed columns. Placed doodads (trees, bushes, rocks) still float.
+   - **Underground (Phase 3).** VMaNGOS `MovementHandler.cpp`: both undermap rescues skip bridged
+     players. MC mobs > 1 block under their column's top get no WoW proxy. `NaturalSpawnerMixin`:
+     spawn tries in filled chunks pick a random column's ground (bedrock+1..top), never the WoW
+     surface (user: MC mobs spawn underground only). `ServerLevelPrecipitationMixin`: no MC snow or
+     ice in WoW dimensions (snow layers poked through WoW's ground). benilla: `render.rs` sends MC
+     sky light in `uv_b.y`; `wow_model.wgsl` (fork, bit-14 MC meshes) lights MC blocks as
+     `tint * (WoW sun/ambient + WoW point lights) * sky + MC torch light`; fork
+     `terrain_holes::CameraUnderground` (0..1 over 2 yd under the heightfield, set by crate
+     `holes.rs`) fades the storm fog (`lighting/resolve.rs`) and gates precipitation as indoors.
+9. **Performance** (2026-10-02; user: "just about right"). benilla is main-thread bound (GPU ~35%).
+   Fixed: overlay frames go shm -> GPU texture on the render thread, changed bands only
+   (`overlay.rs upload_overlay`; was 4 full-frame copies on the main thread); section entities get
+   a one-off `Aabb` + `NoAutoAabb` (Bevy re-ran `compute_aabb` on every section each frame - 32% of
+   the main thread at ~3,900 sections); the mod drops sections/lights of chunks MC unloaded
+   (`McwowWorldExporter.dropUnloaded`; WoW kept every section ever passed - 4,350 after a short
+   flight), so MC blocks show only within MC's render distance; buried mobs (> 1 under their
+   column top) not exported unless the camera is underground or a dug column is within 1 block.
+   Measure: `perf record -t <main tid>` on the host (`distrobox-host-exec`), `--call-graph lbr`.
+   Buried sections cost only ~0.3 ms (hidden vs shown A/B). The DP-2 monitor is 165 Hz, HDMI-A-1
+   60 Hz (vsync caps at 60 there); `WOW_NOVSYNC=1` for uncapped runs. Open: a WoW area sometimes
+   stays unloaded until walked into, MC chunks show there (not yet diagnosed).
+   Parked (user, 2026-10-02, "super niche"): with the camera below WoW's ground, a jagged
+   head-and-shoulders shape centred on screen hides Minecraft water (translucent) behind it; it
+   stays centred when turning, shows in third person and WoW UI mode, never above ground. Not the
+   WoW body (the first-person fade already hides its parts, `player/camera.rs`; hiding the unit
+   too changed nothing) - suspect a camera-attached benilla pass gated by being under the ground
+   (`CameraUnderground` / storm fog / weather) writing depth.
+   Also open: the KWin rule (`~/.config/kwinrulesrc`, class `benilla`, screen 0) doesn't put the
+   window on DP-2 - try screen 1 (user: low priority).
+10. **Outdoor water** (2026-10-02) - built, then PARKED by the user as a finishing touch:
+   `McwowTerrainFill.WATER_ENABLED = false`; while off each chunk's placed water is removed once per
+   session with its data, so Steve walks through WoW water again. What exists: benilla `terrain.rs`
+   sends per column the MCLQ surface + kind (16-byte columns; fork: `WaterChunkInfo::surface_z_at`
+   made `pub`); the fill puts water sources (`UPDATE_SKIP_ON_PLACE`, no fluid ticks) from over the
+   top block to the block holding WoW's surface; attachments `mcwow:wow_water_tops` (top block) and
+   `mcwow:wow_water_surface` (exact, 1/1024); `FluidHeightMixin` gives the top block WoW's exact
+   height; `FlowingFluidMixin` keeps WoW water from spreading sideways out of its volume;
+   `drainStrays` removes spills; the exporter skips WoW-water blocks (WoW draws its own) and
+   re-meshes when the attachment arrives late; `AbstractBoatMixin` surfaces a submerged boat and
+   floats it on WoW's exact surface. Verified live: swimming, rivers contained, boats float with no
+   bob. Open when resumed: WoW's water shows through a boat's hull (vanilla hides it with the
+   boat's `water_mask`; plan: export it, draw depth-only in benilla before WoW water - user agreed
+   to this over hiding WoW water); magma -> lava (user: later); no water mobs (user).
+   Kept on: boats on WoW land (`BoatItemMixin` lifts placement onto WoW ground; boats step 1/3
+   block; ground friction from the column's top block) - user picked "vanilla-like on land".
+11. **Leveling** (2026-10-02; design in project memory `game-design`): the WoW server keeps the
+   character's level/XP; kill XP waits in Minecraft XP orbs. VMaNGOS: `Rate.XP.*` = 3 in the live
+   `mangosd.conf`; `Player::GiveXP` hook `ClassicCraft::HoldKillXP` holds a bridged player's kill
+   XP in a per-player ledger and sends `SMSG_CC_XP_DROP` (833: id, victim guid, corpse xyz, XP,
+   level, rank; none for 0 XP); `CMSG_CC_XP_CLAIM` (834: id, XP) grants it through `GiveXP` as
+   kill XP (`ClaimedKill` guid for the rested bonus and XP message; `SendLogXPGain` takes a guid
+   now); logs `[classiccraft] ... held as drop` / `claimed`. benilla: drop -> actors damage ring
+   kind 0x10; header 48/52 = PLAYER_XP / NEXT_LEVEL_XP; `REN_XP_CLAIM` (14) -> claim. Mod:
+   `McwowXp` drops 3 orbs (5 elite+) sharing the WoW XP (+1-2 vanilla XP each), payload in a
+   session-only attachment; `ExperienceOrbMixin` (no merging, claim on pickup, step 0.6 on WoW
+   ground). Minecraft's own XP bar IS the WoW level (user): `McwowXp.mirrorLevel` sets level and
+   progress every server tick; `PlayerXpMixin` cancels vanilla XP gains and death XP in WoW
+   dimensions (enchanting tables/anvils are gated by the level and can't lower it; enchanting is
+   to become books-only eventually). Verified live: Mangy Wolf 225 XP in 3
+   orbs, claimed, harming-arrow kills too. Exporter fixes found on the way: `submitCustomGeometry`
+   (XP orbs), translucent render types blended, no-cull types two-sided (elytra), WoW stand-ins
+   skipped in the 48-entity scene cap (snowballs vanished in Goldshire).
+   Quest XP still granted directly (until a Minecraft-side quest UI exists).
+12. **Polish batch** (2026-10-02, after leveling; all user-verified unless marked OPEN):
+   - Entity export (`McwowEntityExporter`): stand-ins skipped; nearest 96 entities by distance
+     (stuck arrows filled the old 48 cap); `submitCustomGeometry` exported (XP orbs); translucent
+     render types blended; no-cull types two-sided (batch header flag 2 -> benilla material).
+     Clear pixels of MC meshes are discarded in `wow_model.wgsl` (bit 14, alpha < 0.01) instead
+     of turning off depth writes (that drew Steve's head behind his body).
+   - Animated atlas frames go straight to the GPU texture from the render world (`render.rs
+     upload_atlas_regions`; editing the asset re-created the texture, water animated every ~3 s).
+   - Placed water squeezed over WoW ground per vertex (`McwowWorldExporter.squeeze`).
+   - No MC weather in WoW dims (`LevelWeatherMixin`). XP orbs step 0.6 (`ExperienceOrbMixin`).
+   - Minecraft's XP bar = WoW level (see Leveling); purple HUD bar removed.
+   - Sounds: benilla `sound/combat.rs` mutes the player's exertion, whoosh, weapon impact/clang
+     and own injury vocal while MC drives; `sound/footsteps.rs` mutes our own WoW steps.
+   - WoW frames hidden in Minecraft mode (crate `input.rs hide_wow_frames`, Lua reparent under
+     `CC_Hider`: MainMenuBar, MultiBars, pet/stance bars, PlayerFrame, TargetFrame; back in WoW UI
+     mode; re-applied ~1/s).
+   - Hand lighting: benilla `combat.rs HandLight` packs WoW ambient (+3 nearest WoW point lights)
+     and sun colour RGB8 into actors header 28/32, sun direction oct-encoded in their high bytes,
+     60 = "LIGH"; mod `LightmapMixin` feeds MC's lightmap, `HandSunMixin` (+`LightingAccessor`)
+     points the LEVEL light at WoW's sun before `renderItemInHand`. Known gap: indoors MC still
+     sees sky (WoW roofs aren't blocks) - interior ambient not used yet.
+   - Footsteps (player): benilla `external.rs publish_ground_terrain` -> `SelfReport.ground_terrain`
+     (TerrainType, `Subject::Unit(self)` so the WMO room claim counts) -> shm difficulty word bits
+     8-15 (+1) -> mod `McwowFootsteps` (steps at vanilla cadence, takeoff/landing step; map Dirt
+     gravel, Metallic metal, Stone, Snow, Wood, Grass/Leaves/DustyGrass grass, Sand, Soggy mud,
+     None silent, 11 = wool) + `EntityStepSoundMixin` (vanilla step cancelled on WoW ground).
+     Floors whose MOMT groundType is None (10) fall back to the floor texture name (fork:
+     `WmoModel.material_texture`, `surface_texture_sample`, `WorldPoint::floor_texture`,
+     `terrain_of_texture` word list) - OPEN: untested live after the fallback landed.
+   - Mob footsteps: `EntityOnPosMixin` points `getOnPosLegacy` and `getOnPos()` (the step's own
+     gate in `applyMovementEmissionAndPlaySound`) at the column's hidden top block when the entity
+     is onGround over air (REACH 6); a column without ground (WoW's terrain hole under a building)
+     takes the nearest column's top (<= 8 away). Ridden horses: `RiddenVehicleGroundMixin` - the
+     server replays a client-driven vehicle's move without gravity and vanilla re-tests onGround
+     only for vertical motion, finding nothing below, so on WoW slopes it read airborne; there,
+     ground within 0.2 under the box = onGround. User-confirmed live 2026-10-02.
+   - Objects outdoors (user picked "find the object"): fork module `benilla-world/src/object_surface.rs`
+     - colliders carry `SurfaceSource` (welds: each hull's world AABB + model path; WMO walk
+     colliders: handle + transform); `ObjectUnderfoot::object_under` down-rays the body world
+     (0.5 over the feet to 0.6 under) and names the hull holding the hit (smallest AABB) or the
+     WMO walking face and its MOPY material (fork: `WmoModel.group_collision_materials`,
+     `benilla_formats::wmo_group_collision_materials`). `external.rs terrain_of_object`, only with
+     no room claim: WMO by its face's texture (`terrain_of_texture`, stone without a word; a
+     collision-only face - stair ramps - takes the same group's nearest visible face 0.8 under to
+     0.3 over), else ground type (not 0/None), else stone - NEVER the WMO file name ("snow_inn"
+     made the Kharanos inn's steps snow); doodad by FILE name (folders name zones: Duskwood,
+     Ironforge), stone words first, then wooden things, else wood. User-confirmed live 2026-10-02.
+   - Clipping (2026-10-02). `McwowTriCollider`: moves over 0.3 blocks resolve
+     in 0.3 pieces (vertical pass along the path, not just its end); airborne walkable ground is
+     caught up to the step height (was 0.3, while slopes only became walls at 0.6 - a slope in
+     between was neither: elytra dives clipped); grounded steep faces count as walls from
+     min(step, half the body) (a 0.6-tall glider/crawler had NO walls when grounded). Offline
+     harness (scratch, not in repo): old code ended 77-92% of elytra dives under a slope and
+     leaked through walls; new 0/2340 and 0/702, walking up/down slopes and stairs unchanged.
+     Rescue from the gap (`McwowColumns.buriedSurface`: closed column, feet within top-0.05..top+1.05,
+     no WoW surface at the feet, WoW surface 0.3..4 over them): `BuriedMobRescueMixin` (server,
+     every 10 ticks per mob) and client `McwowBuriedRescue` (player, every 2 ticks) set the entity
+     on that surface (mobs one 1/8 sub-voxel cell higher: set inside a cell they fell back through
+     it - a horse re-buried twice a second for 7 s); both log `buried at`. Dismounts land on the hidden top block (vanilla's
+     dismount search sees real blocks only) and are fixed by the rescue. User-confirmed live 2026-10-02.
+   - Parked: invisible silhouette over below-ground water (see Performance), KWin screen rule,
+     small doodads (skulls) floating over holes (user: leave as is).
+13a. **Transports** (2026-10-02; user: walk around on decks as in WoW, companions left behind, no
+   building aboard; Deeprun Tram first). Deeprun Tram user-confirmed live 2026-10-02 ("can't find
+   any issues"); lifts user-confirmed too. Next: boats/zeppelins (continent crossing:
+   the server worldports the rider; Steve must land in the new dimension still aboard).
+   - Crossings: user-confirmed live 2026-10-03 (zeppelin both ways, boats Teldrassil-Darkshore
+     and Darkshore-Wetlands). benilla already spares the ridden transport at a
+     worldport, re-anchors its clock to the destination map and keeps its own body on the deck
+     while the bridge is Placing. Mod: `McwowDeckRide` stays aboard while the deck is out of sight
+     (map change CLEAR, no export through the loading screen) for <= 20 s, freezing Steve where he
+     stood until a placement takes over (no deck = a fall to the sea floor); no carry on the tick
+     it returns or across a > 32-block jump; no attach decisions while lost or held.
+     `McwowWorldPlacement` aboard: the hold follows WoW's live position (it rides the deck) and
+     ends when the deck is in (`McwowDecks.has`), not on static geometry; logs `done aboard deck`.
+     Routes: MenethilHarbor <-> Theramore (boat), DurotarZeppelin <-> TirisfalGladesZeppelin.
+     First zeppelin crossing: placed on the right zeppelin, but no control and a fall - the deck
+     carried Steve off the placement spot before the 2-block arrival check (never acked; Placing
+     forever), and the ground hold ran after the deck hold in the same tick and released him at
+     the stale spot. Now: aboard, arrival = target dimension within 8 blocks of WoW's live pose;
+     the ground hold is the else-branch. Mod leaves a deck only after 3 ticks on other ground
+     (single-tick blips mid-flight).
+     Second zeppelin crossing (Tirisfal -> Durotar): same symptom - `McwowDeckRide.endTick` cleared
+     the ride silently whenever the player's level wasn't the active WoW dimension, which is true
+     mid-crossing (the placement switches `activeDimension` before the teleport lands); the hold
+     then took the ground branch. A ride now ends only by its rules (3 ticks on other ground,
+     water, deck absent 20 s).
+   - Elytra over the Teldrassil-Darkshore sea outran terrain streaming: benilla's backstop cover
+     ("focus not resident") made `SelfReport.in_world` false, benilla's mover dropped the body,
+     and the cover's end placed Steve there ("entered the world"); the ground hold found nothing
+     over deep sea (5 s). Fork: `LoadingScreen::streaming_only` (set by the backstop, cleared by
+     any raise, blackout or snap); `publish_report` stays in world through such a cover. The
+     cover itself still shows briefly.
+   - Before: the collision export froze transports into the static cells at their spawn spots
+     (invisible collidable trams; the moving ones were walked through) and the rider attach never
+     ran (`external::step` reported no ground).
+   - benilla: `external::DeckTransport { guid }` inserted at `transport.rs arm_transports`;
+     `external::step` reports `ExternalPose::deck` (set by the crate's `compose_rider` from the
+     mod's rider block) as `ground`, so `ride::update_attachment` boards the deck the MOD says and
+     the wire carries ON_TRANSPORT (a down-ray missed the moving car - avian's colliders trail it a
+     frame - and benilla flickered board/deboard the whole ride).
+     Crate `decks.rs`: deck faces left out of geom cells (`OnDeck`); each deck within 250 yd sent as
+     `MSG_DECK` (5) in its own frame (collider `shape()` through the model's Transform chain - avian's
+     ColliderTransform drifted a frame's travel and re-sent each car every frame), `MSG_DECK_GONE`
+     (6); a seqlocked pose table every frame; `compose_rider` turns the mod's rider block
+     (deck-relative eye/feet/yaw) into the world pose through benilla's LIVE deck pose. Geom
+     protocol v3 (`protocol/mcwow_geom_protocol.h`). Tram cars: 550 tris, local [-4.5,-11.5,-6.3]..
+     [4.5,0.4,6.3] blocks (origin near the roof).
+   - Mod: `McwowDecks` (deck store, poses per tick, `near` joins `McwowTriCollider.trianglesNear` -
+     player only), `McwowDeckRide` (START tick: poses + carry incl. yaw; END tick: board when
+     standing on a deck, leave on other ground / water, stay aboard in the air; per frame rider
+     block, against this tick's deck pose), `UseBlockCallback` FAILs block items while aboard.
+     Logs: `board deck` / `deboard`, `deck <guid> (<n> triangles)`.
+   - First live try: boarded fine; once the car moved, benilla logged "placement (the server
+     moved us)" ~20/s - its own `ride::carry` moved the body before `external::take_pose`'s
+     server-move check. Fixed in `controller.rs` (the carry moves `ExternalDrive::applied` along).
+     Board/deboard flickered stepping on: the mod keeps a ride while a deck is within 0.35.
+   - Second try: no fling, camera fine; mod stayed aboard, benilla flickered (fixed as above).
+   - Third try: benilla stayed aboard, but the view sawtoothed at 20 Hz: the rider block measured
+     Steve against the deck LERPED between ticks, yet the carry runs before `commonTick`'s
+     `setOldPosAndRot`, so xo is already in this tick's deck frame. Now measured against this
+     tick's pose only (`McwowDeckRide.publish`).
+   - Fourth try: less flicker, steps played the whole ride. `McwowFootsteps` subtracts the tick's
+     carry (`McwowDeckRide.carried()`); benilla's transport chain now runs before
+     `ExternalDriveSet::Supply` (unordered, `compose_rider` could use last frame's deck pose).
+   - Fifth try: first person perfect, no step spam; Steve flickered in third person (his mesh at
+     Minecraft's world pose). `decks::RiderShift` (composed feet - Minecraft's) moves the avatar
+     parts each frame (`render.rs shift_avatar`). Other MC entities on a deck would need the same.
+13b. **todo.txt round** (2026-10-03; OPEN: test live).
+   - Footsteps aboard: benilla `publish_ground_terrain` takes the ridden transport's model name
+     (`WorldObject.label` of its mesh child) through `terrain_of_doodad` (+ subway/tram and
+     non-Thunder-Bluff elevator = metal, zeppelin/transport = wood); logs `footsteps aboard <model>`.
+   - Spyglass: bridge FOV filter 1..170 (was 10..170; the spyglass is ~7°).
+   - Boat stairs: `McwowTriCollider.WALKABLE_NY` = cos 50° (WoW's limit; was SkyCraft's 0.7 ~45.6°).
+   - Jumping off a deck: `McwowDeckRide` lets go after 10 airborne ticks with no deck within 4
+     blocks below (a jump on deck stays aboard). benilla follows: rider block +44 flags (bit 0 =
+     pose present; guid without it = aboard, deck out of sight); `ExternalPose::deck_known` +
+     `deck: None` ends benilla's ride in the air too (it rode on alone, and the server carried
+     Steve from Wetlands to Darkshore with the boat he flew behind).
+   - Random missing blocks: no lead yet (needs a screenshot + location).
+13c. **GM commands from Minecraft chat** (2026-10-03; OPEN: test). Mod `McwowGmChat`: Fabric
+   `ALLOW_CHAT` swallows lines starting with "." (echoed grey), queued and flushed by
+   `McwowWorldExporter` as `REN_CHAT` (15); crate `combat.rs` `McMsg::Chat` -> benilla
+   `external::ChatOut` -> `ClientCommand::Chat` Say (as WoW's edit box sends `.` lines). Replies:
+   benilla `ChatIn` (CHAT_MSG_SYSTEM, not addon) -> crate `relay_chat` -> actors text ring (protocol
+   v3, 64 x 256 B) -> `McwowActors.drainText` -> Minecraft chat, yellow, |c/|r/|H codes stripped.
+   User-confirmed live. WoW's chat panel (ChatFrame1-7, tabs, menu button, edit box) is in
+   `input.rs HIDDEN_FRAMES` (hidden in Minecraft mode).
+13d. **/dance** (2026-10-03; user-confirmed live: "flawless"). Steve himself dances WoW's race dances (user turned
+   down a WoW body standing in). benilla crate `dances.rs`: on start (thread) writes missing
+   `~/.local/share/classiccraft/dances/<race>_<sex>.ccd` from the user's install: each character
+   model's anim 69 posed like benilla's rig (joint at pivot, offset from parent pivot, keyed T/R/S),
+   measured (torso frame from arm key bones 0/1 + hips; hands = attach 1/2; feet = lowest bone per
+   side UNDER the waist key bone 5 - the models keep parentless floor bones; head key 6) and turned
+   into Steve's parts at 30 fps relative to Stand (root offset/turn about the hip, head, arms
+   shoulder->hand, legs hip->foot; no elbows/knees). Also `dances/self` ("race sex", SelfReport
+   `race_sex`). Offline check: `target/play/cc_dances <dir>` (prints, needs $WOW_DATA) - all 16
+   extract. Mod: `McwowDance` client command `/dance [race] [m|f]`, `/dance stop` ->
+   `McwowDanceNet.Dance` payload (C2S, the server relays to trackers + the dancer: co-op ready);
+   `PlayerModelDanceMixin` poses `PlayerModel` from the clip by `AvatarRenderState.id`/`ageInTicks`;
+   walking > 0.02/tick (deck carry excluded), leaving the ground or dying ends it.
+   File v2: every variation of anim 69 (2-6 per race: weight `frequency`, min/max replay); the
+   client picks by weight, plays min + rand(max - min) times (>= 1), picks again, seeded by the
+   server (payload `seed`) so viewers agree. Elytra (`ElytraModelDanceMixin`, root turn) and armor
+   (`HumanoidModelDanceMixin`, full pose, non-PlayerModel) follow; the cape model is a PlayerModel.
+13e. **WoW music discs** (2026-10-03; OPEN: test). Four discs (user's pick): Tavern (Alliance)
+   `TavernAlliance01`, Sacred `Sacred01`, Main Theme `wow_main_theme`, Thunder Bluff `Thunderbluff
+   Walking 03`. benilla crate `music.rs` extracts the MP3s once to `~/.local/share/classiccraft/
+   music/<key>.mp3`; mod `McwowMusicFiles` converts each to mono Ogg with ffmpeg (needs ffmpeg in
+   the box); `McwowMusic` registers sound events + items (`mcwow:music_disc_<key>`, creative Tools &
+   Utilities); data/mcwow/jukebox_song, assets/mcwow/{sounds.json, items, lang}; silent placeholder
+   Oggs (ours) let the sounds register and `SoundBufferLibraryMixin` streams the real file. Offline
+   helpers: `cc_list <words>` lists client files, `OUT=<dir> cc_extract <words>` copies them out.
+   The full "A Call to Arms" (asked for first) is not in the 1.12 data.
+13f. **NPC chatter in Minecraft chat** (2026-10-03; user-confirmed live). benilla `ui_chat/feed.rs` hands
+   each NPC line, as shown (macros expanded, languages garbled, filtered), to fork
+   `external::npc_line`: monster say/yell/emote/whisper + raid boss emote/whisper, formatted the WoW
+   way (emote `%s` = speaker) with Minecraft § colours (say white, yell red, emote gold, whisper
+   pink) -> `ChatIn` -> actors text ring (v4: 1 KiB slots) -> `McwowGmChat` keeps the colour.
+   Next (user): a general way to interact with WoW NPCs and objects from Minecraft mode - the
+   foundation for quests, vendors, gossip/dialogue, trainers-as-needed, and the side uses (sit on
+   chairs, read plaques/books). Build it as that foundation, not a one-off.
+13g. **Interacting with WoW NPCs and objects from Minecraft** (2026-10-03; books/plaques and range
+   hint user-confirmed). The
+   foundation for quests/vendors/gossip/objects. benilla fork: `external::set_crosshair` (crate
+   `input.rs`: driving && !WoW UI) makes the world picks (`target/hover.rs`) aim at the screen centre
+   (`external::pick_point`), mouse-look or not; new `target/crosshair.rs` (chained after
+   `classify_cursor`) publishes `external::CrosshairTarget` (guid, WoW cursor kind, name, distance,
+   unable) and on `CrosshairUse` latches `PressPick` and writes `WorldRightClick`, so WoW's own
+   right-click runs (gossip, quests, vendor, GO use, range refusals). Books/plaques: `ui_item_text.rs
+   forward_book` sends the whole page chain (`$` expanded) as `external::BookOut` and closes WoW's
+   reader (letters stay WoW's). Crate: focus block in the actors file (v5), REN_INTERACT (17) ->
+   `CrosshairUse`, BookOut -> geom MSG_BOOK (7). Mod `McwowInteract`: actionbar hint ("Right-click:
+   Talk to X", gray "(too far)"), `MinecraftUseMixin` (startUseItem) takes the click when the WoW
+   target is nearer than Minecraft's hit (stand-ins count as WoW), once per press; books open in
+   `BookViewScreen` (title bold, pages cut ~230 chars). Gossip/quest/vendor windows still open as
+   WoW frames (WoW UI mode to use them) until their Minecraft screens exist.
+   Chairs (OPEN: test): using one makes the server seat the WoW body (moves it on, stand state 4/5/6);
+   `SelfReport::stand_state` -> actors self block (v6) -> `McwowDance.sitting`: Steve sits (vanilla
+   riding legs, arms forward, root sunk 12 px), armor/elytra too; `CameraSitMixin` sinks the eye
+   0.75 block. Moving stands WoW up through benilla's posture code.
+13h. **Waygates** (2026-10-03; user-confirmed live: Ironforge, Stormwind, Darnassus; friend sharing untested - needs co-op). User: custom portals linking bases across continents,
+   Warcraft-lore style (mage portals / Titan waygates: a network with a destination menu), mid-game
+   recipe, per player shareable through the WoW FRIEND LIST (a Minecraft friend-list UI later),
+   open world only. Mod `McwowWaygates`: block `mcwow:waygate` (lodestone look, light 10, portal
+   particles, needs diamond pickaxe), recipe OEO/GAG/OOO (obsidian, ender eye, gold, amethyst);
+   network = SavedData `mcwow:waygates` (gates: id, name, dim, pos, arrival yaw, owner WoW guid +
+   names, shared; per-player attunements); placement refused outside mcwow:map_0/map_1 within
+   12000 blocks of the origin (slot 0); placing names it (NamePrompt/Name payloads, the placer's
+   WoW guid from `McwowActors.readMe`), using attunes (if yours or shared) and opens the menu
+   (Menu payload), owner toggles Private/WoW friends (SetShared). Client `McwowWaygateClient`:
+   travel = REN_WAYGATE (18: map, WoW x/y/z/o 1.5 blocks in front facing away, owner guid) ->
+   crate `CMSG_CC_WAYGATE` (835) -> VMaNGOS `HandleCCWaygateOpcode`: both ends continents, other
+   owner -> `character_social` friend row (owner, me, flag 1) else notification; TeleportTo; logs
+   `[classiccraft] <name>: waygate to map`. Placement/worldport brings Steve.
+   Arrival sound (user's pick of 8 candidates; OPEN: test): WoW's `Sound\\Spells\\Teleport.wav`, extracted
+   by crate `music.rs` (TRACKS key `waygate_teleport`, `<key>.<ext>`), Ogg'd by `McwowMusicFiles`
+   (WAV too), event `mcwow:waygate.teleport` (placeholder Ogg + `SoundBufferLibraryMixin`), played
+   as a UI sound by `McwowWaygateClient.placed` when a placement finishes <= 60 s after a travel.
+13i. **Mines** (REMOVED 2026-10-04, see 13u; 2026-10-03; entering/exiting and worldgen v3 (tunnels + entrance cavern + shafts to caves) user-confirmed live). Direction (project memory `game-design`): the world-wide
+   terrain fill goes (chunk loading costs frames; digging in the WoW world becomes an off-by-default
+   toggle - NOT YET DONE), mining moves to separate per-tier dimensions that reset. Mod
+   `McwowMines`: dimension `mcwow:mine_copper` (type `mcwow:mine`: ceiling, no skylight, dark,
+   y -64..128; noise `mcwow:mine` = vanilla `caves` preset with sea_level -64; biome
+   `mcwow:copper_mine`: copper x40 + large x10, coal x30, stone variety, dirt/gravel/sand/clay
+   pockets, lava lakes, springs, monster rooms, vanilla cave mobs). Blocks (unbreakable, creative
+   Functional Blocks, spruce-door look): `mcwow:copper_mine_entrance` (only works in a WoW map
+   dimension) and `mcwow:mine_exit`. Areas: SavedData `mcwow:mines` per tier (index, started,
+   built); an entry older than RESET_MILLIS (2 h) moves new entries to area index+1 at x = index *
+   4096 (old areas stay on disk - cleanup TODO); arrival room (7x7 cobble floor, spruce frame,
+   torches, exit door in the north wall) built once per area at y 40. Shared by everyone.
+   Client `McwowMineClient.away()` (in a mine dim and not leaving): `LevelRendererMixin` lets
+   Minecraft draw its whole level (no cancel, opaque clear, sky), vanilla lightmap; bridge file
+   first-person word bit 1 = away; `McwowWorldPlacement.tick` skips. Exit -> `Leave` payload ->
+   away off -> placement ("left the WoW dimension") brings Steve to the WoW body. benilla crate
+   `bridge.rs` State::Away (pose ignored, input still flows), CMSG_CC_MINE (836, u8) on entering
+   and leaving Away, `place("back from a mine")` on leaving. VMaNGOS `ClassicCraft::SetDownMine`:
+   down = CombatStop, hostile refs dropped, IMMUNE_TO_PLAYER|NPC, VISIBILITY_OFF; up restores
+   (also on CMSG_CC_DIED). Logs: mod `down the copper mine (area n)`, `climbs out`, `mine reset`;
+   mangosd `[classiccraft] <name>: down a mine` / `up from a mine`.
+   Worldgen v2 (user: too open; a cavern where everyone funnels in is fine, tunnels beyond):
+   noise `mcwow:mine` final_density = max(interpolated min(overworld caves/entrances,
+   spaghetti_2d + roughness, noodle), solid floor/roof bands) - solid rock with vanilla's tunnel
+   caves, no cheese caverns; biome carvers just `minecraft:cave`. Entry built per area: domed
+   cavern (r 16, h 10, cobble-patched floor, 8 spruce pillars with lanterns), exit doorway (3 exit
+   blocks, spruce frame) at its heart, 4 winding timbered shafts (5 wide, 4 high, frames every 5,
+   torches every 10) dug on until each breaks into a natural cave (8+ air cells of its 5x4 face, then 2 more steps; max 220, logs `mine shaft ... reached a cave after n`; v2 stopped at 56, short of any cave). `LAYOUT` (3) in `Current`: a change starts a fresh area.
+   First test: entering worked; the exit put Steve under the map - `away` was cached per client tick,
+   so frames between the dimension change and the tick published the mine pose without the bit and
+   benilla drove the WoW body to x/y ~0 (mine coordinates). Now `away()` reads the client level live
+   and stays on until Steve is out of the mine (`staying()` = away && not leaving gates the
+   placement); benilla never drives on the frame it leaves Away (Driving -> Placing after place()).
+13j. **Digging toggle, mine cleanup, early reset** (2026-10-03; OPEN: test). Digging in the WoW world
+   OFF by default then (user: a toggle for fun only, nothing in progression may use it; ON since 13t):
+   `McwowTerrainFill.digging` (SavedData `mcwow:terrain`, loaded at SERVER_STARTED); off, the fill
+   tick instead UNFILLS filled chunks near the player (blocks from each column's bedrock to its top
+   cleared, TOPS/FILLED/WATER/SURFACE removed, chunk resent; logs `terrain unfilled chunk`) - what
+   stands on WoW's ground is untouched; on, the old fill. `McwowCommands` (game masters):
+   `/mcwow digging [on|off]`, `/mcwow mine reset [tier]` (`McwowMines.reset`: next entries go to
+   area index+1). Old areas: `<world>/mcwow_mines.txt` (tier=current index, written on every
+   reset/build) read at SERVER_STARTING, before the levels open their files: region/entities/poi
+   files of `dimensions/mcwow/mine_<tier>` whose middle x is outside the current area's band
+   (index*4096 +- 2048) are deleted (log `deleted n region files of old areas`). JOIN in a mine
+   outside the current area -> `Leave` (the placement brings Steve back). Benilla still streams
+   terrain columns (unused while digging is off). Still to do (user's call): MC mobs spawning in
+   the dark on player-built bases (unfilled chunks keep the void biome = no spawns).
+13k. **Mine tiers at WoW's mines** (REMOVED 2026-10-04, see 13u; 2026-10-03; user-confirmed: Fargodeep entrance placed, tin ore found). Tiers (user): Copper, Tin, Iron, Mithril,
+   Thorium, Dark Iron - `McwowMines.Tier`, a dimension `mcwow:mine_<tier>` + biome `mcwow:<tier>_mine`
+   each (Mithril+ on noise `mcwow:mine_deep`, deepslate); `LAYOUT` 4. WoW ores (`McwowOres`): tin,
+   silver, mithril, truesilver, thorium, dark iron (stone + deepslate blocks drawn as vanilla stone +
+   our own speck overlay PNG; raw chunks and bars as tinted vanilla item models - no Mojang art
+   copied), alloys bronze (copper ingot + tin bar = 2) and steel (iron ingot + coal); smelting and
+   blasting. `tools/gen_mod_data.py` writes all their data (models, loot, tags, recipes, worldgen,
+   lang) - rerun after changing it. Entrances placed automatically (`McwowMineSites`): `tools/mine_sites.py`
+   finds WoW's mines from the DB (ore node spawns >= 6 yd under the ADT terrain, clustered, named by
+   area, tier = best common ore) -> `resources/mcwow/mine_sites.json` (63 sites); a player within 40
+   blocks + WoW collision loaded -> the tier's entrance on a flat, clear floor cell near the node
+   nearest the cluster's middle, once per site (SavedData `mcwow:mine_sites`, log `mine entrance
+   placed in`). Headless data check: `./gradlew runDatacheck -Pdatacheck` (dedicated server in
+   `build/datacheck`, no window; `-Pdatacheck` makes the client-only mod load there) - verified all
+   six tiers generate their ores.
+13l. **Creature loot** (2026-10-03; user-confirmed live). VMaNGOS `ClassicCraft::OnKillLoot` (Unit::Kill after the
+   corpse's loot): a bridged looter's quest items (and quest starters) go straight into the WoW bags,
+   then `SMSG_CC_KILL` (837: guid, entry, xyz, level, rank, type, family, money, flags skinnable,
+   quest items bagged); logs `killed ... Minecraft loot`, `quest item ... into the bags`. benilla
+   relays it as actors ring kind 0x11. Mod `McwowLoot`: skinnable -> WoW leather of the level (light
+   <=17, medium <=27, heavy <=37, thick <=47, rugged), humanoids -> cloth (linen <=14, wool <=24, silk
+   <=34, mageweave <=45, runecloth), money -> emeralds (25 + 0.4 L^2 copper each, ~1 per 4 humanoid
+   kills), themes per creature (`tools/creature_themes.py` -> `resources/mcwow/creature_themes.json`:
+   kobold torches/candles/coal, murloc fish, spider string, skeleton bones, fire elemental blaze
+   powder, air breeze rods...), elites/rares/bosses a chance at an enchanted book. Log `loot of creature`.
+13m. **Levelled gear** (2026-10-03; copper gear user-confirmed; decisions in memory `game-design`). `McwowGear`: component
+   `mcwow:gear` {material, ilvl, req}; crafting stamps the result from the grid's material
+   (`ShapedRecipeMixin`): name, the stats of a vanilla twin (bronze pickaxe = iron's), durability,
+   repair item, leather dye. Look = material (user): leathers -> leather armor dyed per tier, copper
+   -> copper, bronze -> golden, iron/steel -> iron, mithril -> chainmail armor + iron tools, thorium ->
+   diamond, dark iron -> netherite; vanilla recipes kept (copper/iron ingot, cow leather = light,
+   gold = weak ilvl 10); our recipes `data/mcwow/recipe/gear/` (vanilla shapes). Vanilla diamond/
+   netherite recipes stay (26.3's recipe registry can't lose entries) - neither material exists here.
+   Unstamped pieces count as their look's material. Combat: player melee lands at the weapon's ilvl
+   (`attackLevel`; bare hand / non-gear / under-level = 1; projectiles still the character level),
+   WoW hits x `armorFactor` (1 + 0.05 x (attacker level - avg armor ilvl), 0.5..2). Required level
+   gates wearing (`ArmorSlotMixin`, `EquippableMixin`); tooltip "Item Level" / "Requires Level" (red).
+13n. **NPC windows in Minecraft** (2026-10-03; user-confirmed) - the interaction foundation. benilla fork
+   `player/external_dialog.rs`: while the driver has the crosshair, the open gossip menu / questgiver
+   panel / vendor goes out as `DialogOut` (snapshots WoW's Lua frames read: `UiScript::gossip()`,
+   `quest()`, new in the fork) and choices come back as `DialogIn`, queued as the Lua frames'
+   intents (`push_gossip_select`, `push_quest_action`...) so WoW's own logic runs. Quest turn-ins
+   (`SMSG_QUESTGIVER_QUEST_COMPLETE`) go out as kind 7. Crate: `MSG_DIALOG` (geom 8) out,
+   `REN_DIALOG` (19) in; WoW's Gossip/Quest/Merchant frames are faded (alpha 0), NOT hidden, in
+   Minecraft mode - their handlers close the session when the frame can't be visible. In Minecraft
+   mode loot windows (quest objects) always auto-loot (`ui_loot`). Mod `McwowDialogs`: one screen
+   for gossip/greeting/detail/progress/reward (options, objectives, rewards shown as the Minecraft
+   items they become), choices to `REN_DIALOG`; a vendor -> `McwowVendors` (Minecraft trade screen,
+   emeralds; stock by vendor type from `tools/vendor_types.py` -> `resources/mcwow/vendors.json`,
+   970 vendors, gear of the area level's tier); closing it closes the WoW vendor. Quest done ->
+   `McwowQuestRewards`: each WoW reward item -> Minecraft (`McwowDialog.toMinecraft`: armor by slot,
+   cloth/leather -> leather tier, mail/plate/weapons -> metal by ilvl, WoW's ilvl/req kept, quality
+   -> rarity + enchants; wrist/hands/back/jewellery -> enchanted book; bags -> bundle) + money as
+   emeralds. Logs: benilla `dialog kind`, mod `dialog kind`, `vendor ... open`, `quest ... turned in`.
+   User-confirmed live 2026-10-03: quest windows, vendors, loot, copper gear, gossip. Since:
+   WoW confirmation popups (`StaticPopup1..4`, e.g. "Make this inn your home") -> crate
+   `input.rs forward_popups` (polled every 6 frames, faded like the NPC frames) -> `DIALOG_CONFIRM`
+   (8, npc = popup number), the pick clicks that button (close = button 2); logs `WoW popup`,
+   `popup n button m clicked`. A close only closes its own window's screen. User (2026-10-03): WoW
+   looting and bags are to be phased out eventually (quest items in WoW bags is a stopgap).
+   Picked-up drops once stayed on screen frozen (deer, cause unknown): benilla `render.rs` hides the
+   entity scene after 0.5 s without a `REN_SCENE` (log `no Minecraft scene`), the mod logs 30
+   dropped scene frames (`entity mesh ... not sent`).
+13o. **Quest log in Minecraft** (2026-10-03; user-confirmed; key J needed InputConstants.KEY_J - 26.3 key codes are SDL scancodes, GLFW's 74 is Home). User: quest items live in the quest log, not
+   as Minecraft items. benilla fork `external_dialog.rs forward_quest_log`: `UiScript::quest_log()`
+   (new) + the bags' quest items (Lua container verbs every 30 frames; class 12 or quest starters;
+   usable = on-use spell or pages) -> `QuestLogOut` on change and every 5 s; `DIALOG_QUEST_LOG` (9)
+   choices: `ACT_SELECT` uses bag item (arg bag<<8|slot, `UseContainerItem`), `ACT_DECLINE` abandons
+   (`push_quest_log_abandon`). Crate geom `MSG_QUESTLOG` (9). Mod `McwowQuestLog`: key J ("Quest
+   Log", Gameplay; L is vanilla's advancements) or `/quests`; quests left (level, complete/failed),
+   objectives with progress + objectives text + description right (scroll), quest items with Use,
+   Abandon (press twice). Logs: benilla `quest log (n quests, m quest items)`, `quest item in bag`,
+   `quest ... abandoned from Minecraft`.
+13p. **Idle timer** (2026-10-03): benilla's WoW idle handler (`ui_chat/idle.rs`: sit + AFK at 5 min,
+   logout at 30) never saw input while Minecraft drives (the bridge drains it), so the character sat
+   down "randomly". Fork: `stamp_input` stamps every frame while `external::crosshair()`.
+13q. **Testing round fixes** (2026-10-03; user-confirmed). Quest log item names cut with "..." before
+   the Use button (full name as tooltip). A weapon/tool above the character's level can't attack
+   (`McwowGear` AttackEntityCallback, "Requires level N"). Starting weapon once per player (entity
+   tag `mcwow_starter_kit`): stone sword "Worn Shortsword" (ilvl 3) + 4 bread. Vendors also BUY
+   (`McwowVendors.buying`): cloth/leather of the area tier and the one below (8 / 6 per emerald),
+   the tier's raw ore (10), rotten flesh 24, bone 16, string 16, feather 16, spider eye 8. Quest
+   reward picks: 1.12's QUEST_COMPLETE omits the chosen item; `McwowDialogs` remembers it from the
+   reward screen. Later (user): phase out the WoW inventory and WoW loot (no glowing corpses).
+13r. **Gathering WoW objects** (2026-10-03; user's pick "harvest it like a block"; user-confirmed "all working"). Mod
+   `McwowGather`: holding attack on a WoW game object (guid high 0xF110; cursor kinds loot 3, use 4,
+   open 10 - not mining veins/herbs, which need WoW skills) nearer than Minecraft's target: 24
+   ticks of arm swings, hit sounds and block particles of a lookalike block (cactus, planks,
+   leaves, stone... by name), progress bar on the action bar; then REN_INTERACT (WoW's own use;
+   loot auto-looted in Minecraft mode). `MinecraftAttackMixin` keeps Minecraft's attack/mining out
+   meanwhile; hint "Hold attack: Gather X". `McwowQuestLog.announce`: any quest item count that
+   rises (gather or kill) -> pickup sound + "+1 Name  Name: 3/10" on the action bar (log `quest item +`).
+   Timing (user's pick): WoW's Opening cast skipped for bridged players (VMaNGOS `Spell.cpp` hook:
+   OPEN_LOCK spells with lock type >= OPEN, not arm-trap/fishing; profession locks keep their casts);
+   the hold is the timer, 24 ticks bare-handed, faster with the right tool by Minecraft's own mining
+   speed on a lookalike block (axe for wood, hoe/shears for plants and cactus, pickaxe for rock):
+   wooden axe 20, stone 14, iron 11, shears 7. Moving is allowed.
+13s. **Phasing out the WoW inventory** (2026-10-03, user's plan; user: "seems to be good"). VMaNGOS, bridged players
+   only: `ClassicCraft::PrepareInventory` when the bridge switches ON (HELLO repeats every 10 s; only
+   the off->on edge) destroys every equipped/carried item that isn't a quest item (class 12, quest
+   starter, or an active quest's ReqItem/ReqSource/SrcItem) and fills empty bag slots with
+   "20-slot Bag" (1977) for quest items; logs `WoW item ... removed`, `WoW inventory prepared`.
+   `OnKillLoot` clears the corpse's loot after bagging quest items (gold already sent for
+   emeralds) and Unit::Kill then skips UNIT_DYNFLAG_LOOTABLE (no sparkle). `Player::RewardQuest`:
+   no WoW reward items, no positive reward money (`CanRewardQuest` skips the bag-space check);
+   SMSG_QUESTGIVER_QUEST_COMPLETE still lists them (built from the template) for Minecraft.
+   `SpellCaster::CalcArmorReducedDamage`: no WoW armor for a bridged victim. Known gap: WoW quests
+   that ask for trade goods (e.g. Linen Cloth turn-ins) can't be done - Minecraft cloth isn't WoW's.
+   Quest windows no longer list rewards without a Minecraft form ("stays in WoW" removed).
+13t. **Digging without the fill** (2026-10-03; OPEN: test live). User: breaking WoW terrain as
+   before, but no chunks of ground generated under it - blocks placed where needed. Mod
+   `McwowGroundReveal`: with `/mcwow digging on` a new chunk gets only a SHELL (each column's top
+   block + what holds up sand/gravel; TOPS, `mcwow:wow_ground_kind` material|under-structure,
+   `mcwow:wow_ground_placed` bit per ground cell); the ground below is virtual (same
+   `McwowTerrainFill.ground/rock/cave`, now WORLD coordinates). `ServerLevelRevealMixin`
+   (`updatePOIOnBlockStateChange`, end of `Level.setBlock`): a cell turning non-solid-render floods
+   from it - every virtual neighbour placed (UPDATE_CLIENTS, no neighbour updates), into unrevealed
+   cave air and an open column's gap (up to its highest neighbour's top) out to 24 blocks; players
+   re-flood around themselves every 4 blocks walked (caves longer than 24). Bit = placed (dug stays
+   air) or cave air walled. Chunks filled whole before (TOPS, no placed bits) stay as they are.
+   `NaturalSpawnerMixin` skips unknown cells (air pockets over tunnel roofs, unopened caves).
+   Logs `ground revealed at`, `ground placed where needed`. Digging now ON by default (user;
+   SavedData key `digging_on`, the old `digging` key - saved false everywhere - is ignored).
+   Fixed on the way (2026-10-03/04): (1) shell blocks never reached clients past the simulation
+   distance (`Level.setBlock` tells clients only in BLOCK_TICKING chunks) and TOPS arrived first, so
+   columns read as dug: the shelled chunk is now resent whole after its light, THEN its TOPS attach
+   (`McwowGroundReveal` PENDING; the fill tick skips pending chunks). (2) DEADLOCK: worldgen on worker
+   threads calls `ServerLevel.updatePOIOnBlockStateChange` (WorldGenRegion.setBlock); the reveal
+   hook's chunk lookup waited on the server thread - `changed` returns off the server thread.
+   (3) Camera dip while walking (user: first person, only with digging on): the SERVER's pose check
+   (`Player.canPlayerFitWithinBlocksAndEntitiesWhen`) hit a NEIGHBOUR column's hidden top block at
+   chest height where WoW's ground rises steeply (the square box reaches ~0.4 into the next column;
+   `isHiddenGroundUnder` only hid tops within 0.75 of the feet), synced a crawl pose (eye 0.4) to the
+   client for a tick. Found with per-frame camera + mid-tick pose probes (removed). Fix:
+   `McwowColumns.isBuriedFor` (BlockCollisionsMixin): on WoW's surface (own column closed and feet
+   less than 0.95 under its top, or no ground) any block at/under a closed column's top is ignored;
+   in holes and tunnels (feet a block or more under the top) they collide. First version used "feet
+   over own top" and still dipped (also mid-jump): in Dun Morogh (map_0 ~ -642,267,-3972) the player
+   walked 0.66 UNDER their own column's top block - snow tops at 268 over WoW ground ~267.3. Benilla
+   `terrain.rs` lowers fill_top only for faces whose CENTROID is > 0.75 yd under the terrain; a floor
+   partly under it is missed. OPEN: those tops poke above the walked floor (data bug, not fixed).
+   That still dipped (user: "you've fixed it several times"): chasing the blocks behind the
+   server's verdict missed case after case. Mechanism fix instead: client mixin `OwnPoseMixin`
+   (ClientPacketListener.handleSetEntityData) drops server-sent CROUCHING/SWIMMING for the local
+   player in WoW dims - the client computes its own pose every tick (crawlspaces included); sleeping,
+   dying, gliding still apply. User-confirmed fixed 2026-10-04. Also `McwowWorldExporter.hiddenFaces` (closed tops' up face / sides facing a
+   closed gap not exported) - kept, it saves triangles. OPEN: user to confirm the dip is gone.
+13u. **Zone ores under WoW's ground; mine dimensions REMOVED** (2026-10-04, user; OPEN: test live).
+   User's picks: replace the mines, one tier per zone, keep coal/redstone/lapis (no diamond, vanilla
+   iron/copper/gold only as tier ores). `tools/area_levels.py` -> `resources/mcwow/area_levels.json`
+   (AreaTable.dbc: sub-areas have levels, zones don't; zone level = median of its sub-areas', every
+   area of the zone gets it: Elwynn 8, Westfall 15, Duskwood 25, STV 40, Searing Gorge 47, Burning
+   Steppes 54). `McwowZoneOres`: Copper <=10, Tin <=20, Iron <=35, Mithril <=50, Thorium; Searing
+   Gorge / Burning Steppes add Dark Iron; per tier rares first (silver/gold/truesilver deeper), own
+   metal, tier below, redstone, lapis, coal (ratios after the old mine mixes). Shell keeps the area
+   in `mcwow:wow_ground_kind` bits 16+ (columns shelled before: area from this session's terrain,
+   else Copper). Old full-fill chunks keep their vanilla ores. Removed: McwowMines, McwowMineSites,
+   McwowMineClient (away bit), `/mcwow mine reset`, mine dimensions/biomes/noise/features, entrance
+   and exit blocks, `mine_sites.json`, `tools/mine_sites.py`, gen_mod_data's tier section. Placed
+   entrances load as air; old `dimensions/mcwow/mine_*` folders stay on disk (not deleted). Still in
+   the forks, now unused: benilla bridge State::Away + CMSG_CC_MINE (836), VMaNGOS SetDownMine.
+   MISTAKE while removing the mines: `rm -r data/mcwow/dimension` took the 135 WoW map dimensions
+   (map_<id>.json, void flat, type mcwow:wow) with the mine ones - a new world had no WoW dimension
+   ("cannot place Steve - dimension mcwow:map_1 missing"), the bridge sat in Placing forever.
+   Restored from mcwow (`azerothcore-mc/fabric/src/main/resources/data/mcwow/dimension`, identical,
+   made by `azerothcore-mc/tools/gen_dimensions.py` from WotLK's Map.dbc - don't rerun it against
+   1.12 data, the save folders use these ids). Datacheck: fresh world creates all 135.
+13v. **Skipping the race intro from Minecraft mode** (2026-10-04; OPEN: test). The only skip is
+   CinematicFrame's ESC, and Minecraft mode sent every key to Minecraft. Fork: `external::set_cinematic`
+   (set each frame in `cinematic.rs drive_letterbox`) / `external::cinematic()`; crate `input.rs`:
+   no forwarding (and no crosshair) while a cinematic plays - WoW keeps the input as in WoW UI mode.
+   First test: fell through the map after the skip. The cinematic moves the streaming focus and
+   benilla's colliders to its camera, so `geom.rs` resent the cells around the held body nearly
+   empty and Steve fell in Minecraft; after the skip the bridge went straight back to Driving with
+   that pose and the WoW body followed (z 38 -> -1449). Now: `stream_cells` sends nothing while a
+   cinematic plays (the mod keeps its cells), `bridge.rs` holds Placing during one and places
+   afresh ("cinematic over") when it ends. OPEN: test.
+13. **Uncommitted**: everything since the fork commit policy (mod, protocol, tools, benilla
+   `classiccraft` branch, VMaNGOS `classiccraft` branch) is still uncommitted - wait for the user.
+14. **Next** (2026-10-04 wrap-up; design in project memory `game-design`).
+   - Test first (built, not yet confirmed live): 13v race intro (skip with ESC from Minecraft mode,
+     no fall; also a full unskipped intro), 13u zone ores (copper in Elwynn, tin in Westfall, iron in
+     Duskwood; rares 16-24+ blocks down), 13t leftovers (caves walling themselves as you walk, water
+     flowing into dug holes, `/mcwow digging off` unfill).
+   - Still untested from earlier rounds: waygate arrival sound (13h), chairs (13g), music discs (13e),
+     13b items, stuck-drop log (`drop ... not picked up`) if drops on slopes still fail.
+   - Known data bug: benilla `terrain.rs` lowers a column's fill top only for structure faces whose
+     CENTROID is > 0.75 yd under the terrain, so some tops sit above the floor actually walked on
+     (Dun Morogh, 13t). Movement/camera are fine now (`isBuriedFor`, `OwnPoseMixin`); digging aim
+     can pick the wrong block there.
+   - Cleanup offered, not done: the now-unused mine code in the forks (benilla bridge State::Away +
+     CMSG_CC_MINE 836, VMaNGOS `SetDownMine`), old `dimensions/mcwow/mine_*` folders in saves.
+   - Open bugs to watch: picked-up drops once stayed frozen on screen (13n note; logs added).
+   - The WoW-inventory phase-out's gap: quests that hand in trade goods (Linen Cloth...).
+   - Bows/crossbows item level (projectiles still use the character level); stable masters (farm
+     animals); WoW tree chopping; MC mobs spawning in the dark on player bases (user: not now);
+     the rest of the Elwynn slice polish (vendor prices, emerald rates, ore rates - tune by playtesting).
+   - Everything is still uncommitted (fork commit policy: wait for the user).
+
+## What carries over from mcwow
+- Fabric mod (`azerothcore-mc/fabric/`): triangle collision (McwowTriCollider), block/entity
+  exporters, targeting, fluids, mob pathing, combat stand-ins, overlay/input bridge. The scale
+  (1 block = 1.4667 yd) and fixed coordinate mapping (`mcX = wowY/S, mcY = wowZ/S, mcZ = wowX/S`)
+  are defined in mcwow's `protocol/mcwow_protocol.h`.
+- Shared-memory protocols (`azerothcore-mc/protocol/`). Both sides are native Linux now, so the
+  Wine file-backed-mapping workaround no longer matters.
+- geom_server (`azerothcore-mc/vmap_query/`) reads AzerothCore vmaps/.map files; VMaNGOS's
+  formats differ, so it needs adapting or replacing (see plan step 5).
+- Everything learned about WoW's rendering (lighting constants, fog curve, depth mapping) is
+  background knowledge only — in benilla those are variables in the source, not things to measure.
+
+## Working notes
+- Verify live, don't trust docs or memory (mcwow's standing rule). Search for prior art before
+  reverse-engineering anything.
+- Don't redistribute Blizzard or Mojang assets; benilla reads the user's own install.
+- benilla has its own `AGENTS.md` and `docs/CONTRIBUTING.md` — read them before changing the fork.
