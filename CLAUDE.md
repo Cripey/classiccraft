@@ -961,8 +961,9 @@ reference until classiccraft catches up.
 - User-confirmed live: guns held/aimed correctly (after 3 tries: barrel forward, aiming pose in third person), weapon
   damage numbers (rifle 86, wand 16 at copper/L13); chests failed first only because mangosd was stale.
 - User decisions: wand damage stays as is for now (my 70/75/100 retune was declined); no XP cost on anvils; magic
-  costs nothing for now. OPEN: blunderbuss pellets after the `mcwow:bullet` bypasses-cooldown fix (untested), chests,
-  vendor books, enchanted drops/quest rewards, Smite/Bane, anvils, wand schools on resistant creatures.
+  costs nothing for now. User-confirmed live 2026-10-04: blunderbuss pellets (after the `mcwow:bullet` fix), chests,
+  vendor books, enchanted drops/quest rewards, anvils. OPEN: Smite/Bane on WoW undead/arthropods, wand schools on
+  resistant creatures.
 - Next (user): staves - "more interesting spells like AoE spells and maybe summons" (wands came first).
 - Known quirk: WoW quest-reward gear says "Requires level 1" (VMaNGOS stores required_level 0); offered a fix, not
   asked for yet.
