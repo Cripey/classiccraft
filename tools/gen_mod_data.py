@@ -280,11 +280,13 @@ GUN_MAPS = {
 
 
 # Held like a gun (user, 2026-10-04: not straight up like a sword). z turns the drawn 45-degree
-# barrel level first (in the sprite's plane), then y +90 points the sprite's right side - the
-# barrel - away from the player (-90, the sword's, pointed it back at them: first live try).
+# barrel in the sprite's plane first, then y +90 points the sprite's right side away from the
+# player (-90, the sword's, pointed it back at them: first live try). First person: the barrel
+# level. Third person: Steve aims with both arms forward (client AvatarArmPoseMixin, the loaded
+# crossbow's pose) and the item turns with the arm, so the barrel points down the arm (z -135).
 GUN_DISPLAY = {
-    "thirdperson_righthand": {"rotation": [0, 90, -45], "translation": [0, 2.5, 0.5], "scale": [0.95, 0.95, 0.95]},
-    "thirdperson_lefthand": {"rotation": [0, -90, 45], "translation": [0, 2.5, 0.5], "scale": [0.95, 0.95, 0.95]},
+    "thirdperson_righthand": {"rotation": [0, 90, -135], "translation": [0, 1.0, 0.5], "scale": [0.95, 0.95, 0.95]},
+    "thirdperson_lefthand": {"rotation": [0, -90, 135], "translation": [0, 1.0, 0.5], "scale": [0.95, 0.95, 0.95]},
     "firstperson_righthand": {"rotation": [0, 90, -40], "translation": [1.5, 2.6, 0.5], "scale": [0.75, 0.75, 0.75]},
     "firstperson_lefthand": {"rotation": [0, -90, 40], "translation": [1.5, 2.6, 0.5], "scale": [0.75, 0.75, 0.75]},
 }

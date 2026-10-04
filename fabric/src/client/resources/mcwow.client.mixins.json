@@ -37,7 +37,8 @@
     "LevelLoadReadyMixin",
     "AnvilScreenMixin",
     "CameraZoomMixin",
-    "PackRepositoryMixin"
+    "PackRepositoryMixin",
+    "AvatarArmPoseMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
