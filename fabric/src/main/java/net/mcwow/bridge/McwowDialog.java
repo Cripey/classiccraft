@@ -25,8 +25,9 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
  *    material by item level - cloth and leather armor a leather of the level, mail and plate a
  *    metal - stamped with the WoW item's own item level and required level;
  *  - weapons: swords (and daggers, fist weapons), axes (and maces), spears (staves, polearms),
- *    bows, crossbows (and guns), shields; fishing poles a fishing rod;
- *  - the slots Minecraft lacks (wrist, hands, back, neck, finger, trinket, wands, off-hand items):
+ *    bows, crossbows, guns (our rifle, or blunderbuss by name), wands (our wand of the item's damage
+ *    school), shields; fishing poles a fishing rod;
+ *  - the slots Minecraft lacks (wrist, hands, back, neck, finger, trinket, off-hand items):
  *    an enchanted book of the item's level;
  *  - bags a bundle, arrows and bullets arrows, food and drink cooked meat or bread, potions a
  *    healing potion; anything else nothing (the WoW item still lands in the WoW bags).
@@ -186,7 +187,12 @@ public final class McwowDialog {
                     case 2 -> {
                         return finish(gearless(Items.BOW, ilvl, w.req()), w, access, random);
                     }
-                    case 3, 18 -> {
+                    case 3 -> {
+                        // A gun (2026-10-04): a rifle, or a blunderbuss when WoW calls it one.
+                        boolean bb = w.name().toLowerCase().contains("blunderbuss");
+                        return finish(ourWeapon(bb ? McwowGuns.BLUNDERBUSS : McwowGuns.RIFLE, ilvl, w.req()), w, access, random);
+                    }
+                    case 18 -> {
                         return finish(gearless(Items.CROSSBOW, ilvl, w.req()), w, access, random);
                     }
                     case 16 -> {
@@ -196,7 +202,10 @@ public final class McwowDialog {
                         return new ItemStack(Items.FISHING_ROD);
                     }
                     case 19 -> {
-                        return book(w, access, random);
+                        // A wand (2026-10-04): a wand of its damage school (a physical one: arcane).
+                        McwowSpells.School school = McwowSpells.School.byWow(w.dmgType());
+                        Item wand = McwowWands.WANDS.get(school != null ? school : McwowSpells.School.ARCANE);
+                        return finish(ourWeapon(wand, ilvl, w.req()), w, access, random);
                     }
                     default -> { }
                 }
@@ -253,6 +262,16 @@ public final class McwowDialog {
         // and weapons a metal.
         String material = armor && w.subclass() <= 1 ? cloth(ilvl) : armor && w.subclass() == 2 ? leather(ilvl) : metal(ilvl);
         return finish(piece(material, piece, ilvl, w.req()), w, access, random);
+    }
+
+    /** One of our own weapons (wand, gun) of the item level's metal, stamped with the WoW item level and required level. */
+    public static ItemStack ourWeapon(Item item, int ilvl, int req) {
+        if (item == null || !(item instanceof McwowGear.Stampable st)) return ItemStack.EMPTY;
+        ItemStack s = new ItemStack(item);
+        McwowGear.Material m = McwowGear.material(metal(ilvl));
+        st.stamp(s, m);
+        s.set(McwowGear.GEAR, new McwowGear.Gear(m.id(), ilvl, Math.max(1, req)));
+        return s;
     }
 
     private static ItemStack gearless(Item item, int ilvl, int req) {

@@ -133,7 +133,15 @@ public final class McwowChests {
      */
     public static List<GearOption> gearOptions(int level) {
         List<GearOption> out = new ArrayList<>();
-        float each = 1.0F / PIECES.length;
+        // Wands and guns (2026-10-04) are pieces too: a wand of any school, a rifle, a blunderbuss.
+        float each = 1.0F / (PIECES.length + 3);
+        int req = Math.max(1, level - 2);
+        for (Item wand : McwowWands.WANDS.values()) {
+            out.add(new GearOption(McwowDialog.ourWeapon(wand, level, req), each / McwowWands.WANDS.size()));
+        }
+        out.add(new GearOption(McwowDialog.ourWeapon(McwowGuns.RIFLE, level, req), each));
+        out.add(new GearOption(McwowDialog.ourWeapon(McwowGuns.BLUNDERBUSS, level, req), each));
+        out.removeIf(o -> o.stack().isEmpty());
         for (String piece : PIECES) {
             boolean armor = piece.equals("helmet") || piece.equals("chestplate") || piece.equals("leggings") || piece.equals("boots");
             String[] mats = armor ? new String[] {McwowDialog.metal(level), McwowDialog.leather(level), McwowDialog.cloth(level)}
