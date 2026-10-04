@@ -948,6 +948,28 @@ reference until classiccraft catches up.
 - Lesson: an edit script did `open(p,'w').write(open(p).read())` and emptied sim.py (restored from Claude Code's
   file-history). Always read before opening for write.
 
+## Session 2026-10-04 (third part) - state at wrap-up
+- Everything committed and pushed in small commits (all three repos clean, in sync with GitHub). mangosd restarted
+  on the latest build (spell schools in); benilla and the mod must be run at their latest builds together (dialog item
+  stats, hit flags).
+- Built this session (`docs/topics.md` rows 32-38, plan steps 25-27): treasure chests (right-click; locked = pry with a
+  pickaxe), curated enchantments (random on drops, set from WoW stats on quest rewards, Smite/Bane on WoW creatures,
+  Looting), creature gear drops, enchanting suppliers' books + early chest books, difficulty curve refitted with
+  enchanted gear as the norm, WoW anvils (right-click) costing only materials, spell schools on hits (server
+  resistances, DoTs, Chill), ranged hits at weapon ilvl, Fire Aspect on WoW creatures, wands (6 schools), rifle +
+  blunderbuss + 5 ammo tiers, guns/wands from vendors, quest rewards and gear drops; sim: chests, enchanting, styles.
+- User-confirmed live: guns held/aimed correctly (after 3 tries: barrel forward, aiming pose in third person), weapon
+  damage numbers (rifle 86, wand 16 at copper/L13); chests failed first only because mangosd was stale.
+- User decisions: wand damage stays as is for now (my 70/75/100 retune was declined); no XP cost on anvils; magic
+  costs nothing for now. OPEN: blunderbuss pellets after the `mcwow:bullet` bypasses-cooldown fix (untested), chests,
+  vendor books, enchanted drops/quest rewards, Smite/Bane, anvils, wand schools on resistant creatures.
+- Next (user): staves - "more interesting spells like AoE spells and maybe summons" (wands came first).
+- Known quirk: WoW quest-reward gear says "Requires level 1" (VMaNGOS stores required_level 0); offered a fix, not
+  asked for yet.
+- Lessons: Minecraft 26.3's hit cooldown is `LivingEntity.damageCooldownTime` (not Entity.invulnerableTime) - use the
+  `bypasses_cooldown` damage-type tag; held-item display transforms: in the hand's frame the sprite's in-plane
+  rotation runs the barrel along the arm, y +90 points the sprite's right side away from the player.
+
 ## What carries over from mcwow
 - Fabric mod (`azerothcore-mc/fabric/`): triangle collision (McwowTriCollider), block/entity
   exporters, targeting, fluids, mob pathing, combat stand-ins, overlay/input bridge. The scale
