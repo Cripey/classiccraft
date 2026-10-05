@@ -120,6 +120,10 @@ impl Db {
                 "root",
             ]);
             c.arg(format!("-p{}", self.root_pass));
+            // Local only: no TLS. The 11.x client otherwise insists on TLS and checks the
+            // server's self-made certificate, which failed on a real Windows PC (2026-10-05:
+            // "certificate is not within its validity period").
+            c.arg("--skip-ssl");
         } else {
             c.arg(format!("--socket={}", self.socket().display()));
         }

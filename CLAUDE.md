@@ -985,6 +985,9 @@ reference until classiccraft catches up.
    directory polluted" (VMapExtractor refuses a non-empty Buildings/). extract.rs now: extractors get no stdin,
    VMapAssembler `--silent`, each step marked (`extract-maps|buildings|vmaps|mmaps`) and its outputs cleared before a
    (re)run, "still working... N min" every minute.
+   Second try: extraction finished; the account step failed: the MariaDB 11.8 client (Windows, TCP) insists on TLS
+   and rejected the server's self-made certificate (CERT_E_EXPIRED - likely the dual-boot clock). db.rs passes
+   `--skip-ssl` on Windows (loopback only). Fixed launcher copied into the user's test folder.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
