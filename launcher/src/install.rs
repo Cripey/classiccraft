@@ -17,6 +17,8 @@ pub struct Settings {
     pub account: Option<String>,
     /// The account's password, kept so WoW logs in by itself (the server only listens on this PC).
     pub password: Option<String>,
+    /// The save Play starts: its WoW character's name (= its Minecraft world's folder).
+    pub save: Option<String>,
     pub db_port: u16,
     pub realm_port: u16,
     pub world_port: u16,
@@ -36,6 +38,7 @@ impl Default for Settings {
             wow_client: None,
             account: None,
             password: None,
+            save: None,
             db_port: 3307,
             realm_port: 3725,
             world_port: 8086,

@@ -154,16 +154,17 @@ pub fn install(inst: &Install) -> anyhow::Result<()> {
         std::fs::copy(jar, mods.join(jar.file_name().expect("file")))?;
     }
 
-    // The mod reads the server's character database (instance ids); point it at ours.
-    let config = serde_json::json!({
-        "jdbcUrl": format!("jdbc:mysql://127.0.0.1:{}/characters", s.db_port),
-        "user": s.db_user,
-        "password": s.db_pass,
-    });
-    std::fs::write(
-        game.join("config").join("mcwow.json"),
-        serde_json::to_string_pretty(&config)?,
-    )?;
+    // The mod reads the server's character database (instance ids); point it at ours. Other keys
+    // (the chosen save's "world", switches) are kept.
+    let path = game.join("config").join("mcwow.json");
+    let mut config = read_config(&path);
+    config.insert(
+        "jdbcUrl".into(),
+        format!("jdbc:mysql://127.0.0.1:{}/characters", s.db_port).into(),
+    );
+    config.insert("user".into(), s.db_user.clone().into());
+    config.insert("password".into(), s.db_pass.clone().into());
+    std::fs::write(&path, serde_json::to_string_pretty(&config)?)?;
 
     if mc.to_string_lossy().contains("com.mojang.Minecraft") {
         ui::warn(
@@ -199,6 +200,51 @@ fn add_profile(file: &Path, version_id: &str, game: &Path) -> anyhow::Result<()>
     p.insert("lastUsed".into(), now.into());
     std::fs::write(file, serde_json::to_string_pretty(&data)?)?;
     Ok(())
+}
+
+/// The mod's settings file, as an object (empty when missing or unreadable).
+fn read_config(path: &Path) -> serde_json::Map<String, serde_json::Value> {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default()
+}
+
+/// The classiccraft profile's game folder (`<Minecraft folder>/classiccraft`), once installed.
+pub fn game_dir(inst: &Install) -> Option<PathBuf> {
+    inst.mark_content("minecraft")
+        .map(|m| PathBuf::from(m.trim()).join("classiccraft"))
+}
+
+/// The save Minecraft opens next: its world (`saves/<name>`, made the first time) - the mod reads
+/// "world" from config/mcwow.json.
+pub fn set_world(inst: &Install, name: &str) -> anyhow::Result<()> {
+    let Some(game) = game_dir(inst) else {
+        return Ok(());
+    };
+    let path = game.join("config").join("mcwow.json");
+    let mut config = read_config(&path);
+    config.insert("world".into(), name.into());
+    std::fs::create_dir_all(game.join("config"))?;
+    std::fs::write(&path, serde_json::to_string_pretty(&config)?)?;
+    Ok(())
+}
+
+/// The Minecraft launcher's signed-in player name (launcher_accounts*.json: the active account's
+/// profile), for a new save's suggested name.
+pub fn username(inst: &Install) -> Option<String> {
+    let mc = PathBuf::from(inst.mark_content("minecraft")?.trim());
+    ["launcher_accounts.json", "launcher_accounts_microsoft_store.json"]
+        .iter()
+        .filter_map(|f| std::fs::read_to_string(mc.join(f)).ok())
+        .filter_map(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .find_map(|v| {
+            let id = v["activeAccountLocalId"].as_str()?;
+            v["accounts"][id]["minecraftProfile"]["name"]
+                .as_str()
+                .map(str::to_string)
+        })
 }
 
 /// Play (launcher phase 1, 2026-10-05): Minecraft's own launcher, opened on the classiccraft profile

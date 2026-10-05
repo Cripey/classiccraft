@@ -211,7 +211,8 @@ pub fn grant_gm(db: &Db, user: &str) -> anyhow::Result<()> {
 }
 
 /// A play session: database, server, the WoW client; server console on stdin until the player quits.
-pub fn play(inst: &Install) -> anyhow::Result<()> {
+/// A play session on the chosen save (`new_save`: make a new one first).
+pub fn play(inst: &Install, new_save: bool) -> anyhow::Result<()> {
     let s = inst.settings();
     let client = s
         .wow_client
@@ -221,7 +222,7 @@ pub fn play(inst: &Install) -> anyhow::Result<()> {
     ui::step("Starting the database and the server");
     db.start()?;
     let mut server = Server::start(inst)?;
-    let r = session(inst, &db, &s, &client, &mut server);
+    let r = session(inst, &db, &s, &client, &mut server, new_save);
     ui::say("Stopping the server and the database...");
     server.stop();
     db.stop()?;
@@ -235,10 +236,16 @@ fn session(
     s: &Settings,
     client: &Path,
     server: &mut Server,
+    new_save: bool,
 ) -> anyhow::Result<()> {
     server.wait_ready()?;
     ui::ok("server running");
-    let mut login = login(inst, db, s)?;
+    let Some(mut login) = login(inst, db, s, new_save)? else {
+        return Ok(());
+    };
+    if let Some(name) = &login.character {
+        minecraft::set_world(inst, name)?;
+    }
 
     ui::say("");
     let mut wait_for_minecraft = true;
@@ -261,13 +268,14 @@ fn session(
         }
         Err(e) => ui::warn(&format!("Couldn't start the Minecraft launcher: {e:#}")),
     }
-    match &login.character {
-        Some(name) => ui::say(&format!(
-            "WoW opens once Minecraft is in your world, and logs in as {name}."
+    match (&login.character, login.create) {
+        (Some(name), true) => ui::say(&format!(
+            "WoW opens once Minecraft is in {name}'s new world, and creates {name}."
         )),
-        None => ui::say(
-            "WoW opens once Minecraft is in your world, and logs in; create your character there.",
-        ),
+        (Some(name), false) => ui::say(&format!(
+            "WoW opens once Minecraft is in {name}'s world, and logs in as {name}."
+        )),
+        (None, _) => ui::say("WoW opens once Minecraft is in your world."),
     }
     ui::say(
         "In the WoW window, ` (backtick) switches between Minecraft controls and WoW's own UI.",
@@ -292,7 +300,14 @@ fn session(
     }
 
     loop {
-        login.character = last_character(db, login.account.as_deref());
+        // Made by an earlier start (or refused - WoW's character screen then).
+        if login.create
+            && let (Some(user), Some(name)) = (&login.account, &login.character)
+        {
+            login.create = !crate::saves::list(db, user)?
+                .iter()
+                .any(|c| c.name.eq_ignore_ascii_case(name));
+        }
         let mut wow = start_client(inst, s, client, &login)?;
         ui::ok("WoW started");
         let quit = loop {
@@ -381,19 +396,20 @@ fn close_client(inst: &Install, wow: &mut Child) {
     let _ = wow.kill();
 }
 
-/// Who WoW logs in as: the saved account and password, and the character played last.
+/// Who WoW logs in as: the saved account and password, and the save's character (`create`: WoW
+/// makes it first - a new save).
 struct Login {
     account: Option<String>,
     password: Option<String>,
     character: Option<String>,
+    create: bool,
 }
 
-/// The saved login; an install from before 2026-10-05 has no saved password, so it's asked once.
-fn login(inst: &Install, db: &Db, s: &Settings) -> anyhow::Result<Login> {
-    let account = s
-        .account
-        .clone()
-        .filter(|a| !a.is_empty() && a.chars().all(|c| c.is_ascii_alphanumeric()));
+/// The saved login and the save to play (`None` = the player cancelled a new save). The save is
+/// the chosen one, else the character played last, else a new one; an install from before
+/// 2026-10-05 has no saved password, so it's asked once.
+fn login(inst: &Install, db: &Db, s: &Settings, new_save: bool) -> anyhow::Result<Option<Login>> {
+    let account = crate::saves::account(s);
     let mut password = s.password.clone();
     if let (Some(user), None) = (&account, &password) {
         ui::say(&format!(
@@ -411,26 +427,38 @@ fn login(inst: &Install, db: &Db, s: &Settings) -> anyhow::Result<Login> {
             password = Some(p);
         }
     }
-    let character = last_character(db, account.as_deref());
-    Ok(Login {
+    let Some(user) = &account else {
+        return Ok(Some(Login {
+            account,
+            password,
+            character: None,
+            create: false,
+        }));
+    };
+    let saves = crate::saves::list(db, user)?;
+    let chosen = s
+        .save
+        .as_deref()
+        .and_then(|n| saves.iter().find(|c| c.name.eq_ignore_ascii_case(n)))
+        .or_else(|| saves.first())
+        .filter(|_| !new_save)
+        .map(|c| c.name.clone());
+    let (character, create) = match chosen {
+        Some(name) => (name, false),
+        None => match crate::saves::ask_new_name(inst, db, user)? {
+            Some(name) => (name, true),
+            None => return Ok(None),
+        },
+    };
+    let mut saved = inst.settings();
+    saved.save = Some(character.clone());
+    inst.save_settings(&saved)?;
+    Ok(Some(Login {
         account,
         password,
-        character,
-    })
-}
-
-/// The account's character logged out last; none yet = WoW's character screen, to make one.
-fn last_character(db: &Db, account: Option<&str>) -> Option<String> {
-    let user = account?;
-    db.query(
-        Some("characters"),
-        &format!(
-            "SELECT c.name FROM characters c JOIN realmd.account a ON a.id = c.account \
-             WHERE a.username = UPPER('{user}') ORDER BY c.logout_time DESC, c.guid DESC LIMIT 1"
-        ),
-    )
-    .ok()
-    .filter(|n| !n.is_empty())
+        character: Some(character),
+        create,
+    }))
 }
 
 fn start_client(
@@ -449,6 +477,9 @@ fn start_client(
         cmd.env("WOW_USER", user).env("WOW_PASS", pass);
         if let Some(name) = &login.character {
             cmd.env("WOW_CHAR", name);
+            if login.create {
+                cmd.env("WOW_CREATE_CHAR", name);
+            }
         }
     }
     cmd.current_dir(exe.parent().expect("in client/"))
