@@ -1,0 +1,236 @@
+# Release builds of all three pieces from one snapshot: the benilla fork (classiccraft client),
+# the VMaNGOS fork (server + extractors) and the Fabric mod, for Linux and Windows x64.
+# - Manual run (Actions tab -> Release -> Run workflow): the archives are kept as the run's
+#   artifacts only (visible to the repository's members), nothing is published.
+# - A pushed tag v*: the same, plus a DRAFT GitHub release with the archives - publish it by hand.
+# No Blizzard or Mojang files go in: the player's own WoW install is read at run/setup time.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      benilla_ref:
+        description: Cripey/benilla-classiccraft branch, tag or commit
+        default: main
+      vmangos_ref:
+        description: Cripey/VMaNGOS-classiccraft branch, tag or commit
+        default: development
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BENILLA_REF: ${{ inputs.benilla_ref || 'main' }}
+  VMANGOS_REF: ${{ inputs.vmangos_ref || 'development' }}
+
+jobs:
+  mod:
+    name: Mod jar
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+      - name: Build
+        working-directory: fabric
+        run: ./gradlew build
+      - name: Collect
+        run: |
+          mkdir -p out
+          for j in fabric/build/libs/classiccraft-bridge-*.jar; do
+            [[ $j == *-sources.jar ]] || cp "$j" out/
+          done
+          git rev-parse HEAD > out/classiccraft.sha
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mod
+          path: out/
+
+  client:
+    name: Client (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-24.04
+            exe: ""
+          - os: windows
+            runner: windows-2022
+            exe: .exe
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: Cripey/benilla-classiccraft
+          ref: ${{ env.BENILLA_REF }}
+          path: benilla
+          # benilla's build stamp runs `git describe --tags`.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Free disk space
+        if: matrix.os == 'linux'
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: System libraries
+        if: matrix.os == 'linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq pkg-config libasound2-dev libudev-dev
+      - name: Toolchain
+        working-directory: benilla
+        shell: bash
+        run: rustup toolchain install && rustc -V
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: benilla
+          key: ship
+      - name: Build (ship profile)
+        working-directory: benilla
+        shell: bash
+        run: cargo build --profile ship -p classiccraft --bin classiccraft --bin cc_weapon
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir -p out
+          cp benilla/target/ship/classiccraft${{ matrix.exe }} benilla/target/ship/cc_weapon${{ matrix.exe }} out/
+          git -C benilla rev-parse HEAD > out/benilla.sha
+      - uses: actions/upload-artifact@v7
+        with:
+          name: client-${{ matrix.os }}
+          path: out/
+
+  server-linux:
+    name: Server (linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: Cripey/VMaNGOS-classiccraft
+          ref: ${{ env.VMANGOS_REF }}
+          path: vmangos
+          persist-credentials: false
+      - name: Build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends build-essential cmake libmysqlclient-dev \
+            libssl-dev patchelf zlib1g-dev
+      - name: Build
+        working-directory: vmangos
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PWD/_install" \
+            -DBUILD_EXTRACTORS=1 -DBUILD_FOR_HOST_CPU=0 -DCONF_DIR:STRING=./etc -DDEBUG_SYMBOLS=0
+          cmake --build build -j "$(nproc)"
+          cmake --install build
+      - name: Package with VMaNGOS's own script (bundles the non-glibc libraries)
+        working-directory: vmangos
+        run: |
+          ./.github/scripts/package-linux-release.sh _install server.tar.gz
+          mkdir -p ../out/server
+          tar -xzf bin/server.tar.gz -C ../out/server --strip-components=1
+          ls ../out/server ../out/server/bin
+          ../out/server/bin/mangosd --version
+          git rev-parse HEAD > ../out/vmangos.sha
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-linux
+          path: out/
+
+  server-windows:
+    name: Server (windows)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: Cripey/VMaNGOS-classiccraft
+          ref: ${{ env.VMANGOS_REF }}
+          path: vmangos
+          persist-credentials: false
+      - name: Build
+        working-directory: vmangos
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -DBUILD_EXTRACTORS=1 -G "Visual Studio 17 2022" -A x64
+          cmake --build build --config Release --parallel
+      - name: Package
+        working-directory: vmangos
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ../out/server/bin ../out/server/etc
+          cp -r bin/Release/. ../out/server/bin/
+          cp dep/windows/lib/x64_release/libmySQL.dll dep/windows/lib/x64_release/libeay32.dll ../out/server/bin/
+          # The .conf.dist defaults (tools/server-config.sh writes the live confs from them).
+          find build bin -name '*.conf.dist' -exec cp {} ../out/server/etc/ \;
+          ls ../out/server/bin ../out/server/etc
+          git rev-parse HEAD > ../out/vmangos.sha
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-windows
+          path: out/
+
+  package:
+    name: Package
+    needs: [mod, client, server-linux, server-windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: SQL the setup applies - VMaNGOS migrations and classiccraft's own rows
+        uses: actions/checkout@v6
+        with:
+          repository: Cripey/VMaNGOS-classiccraft
+          ref: ${{ env.VMANGOS_REF }}
+          path: vmangos
+          sparse-checkout: |
+            sql/migrations
+            sql/custom
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          path: parts
+      - name: Assemble
+        run: |
+          set -euo pipefail
+          for os in linux windows; do
+            d="stage/classiccraft-$os-x64"
+            mkdir -p "$d/client" "$d/mod" "$d/sql"
+            cp -r "parts/server-$os/server" "$d/server"
+            cp parts/client-$os/classiccraft* parts/client-$os/cc_weapon* "$d/client/"
+            cp parts/mod/*.jar "$d/mod/"
+            cp -r vmangos/sql/migrations vmangos/sql/custom "$d/sql/"
+            cp README.md "$d/"
+            {
+              echo "classiccraft $(cat parts/mod/classiccraft.sha)"
+              echo "benilla-classiccraft $(cat parts/client-$os/benilla.sha)"
+              echo "VMaNGOS-classiccraft $(cat parts/server-$os/vmangos.sha)"
+            } > "$d/VERSIONS.txt"
+          done
+          chmod +x stage/classiccraft-linux-x64/client/* stage/classiccraft-linux-x64/server/bin/*
+          (cd stage && tar -czf ../classiccraft-linux-x64.tar.gz classiccraft-linux-x64 \
+            && zip -qr ../classiccraft-windows-x64.zip classiccraft-windows-x64)
+          ls -la classiccraft-*-x64.*
+          cat stage/classiccraft-linux-x64/VERSIONS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: classiccraft-release
+          path: classiccraft-*-x64.*
+      - name: Draft release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" classiccraft-linux-x64.tar.gz classiccraft-windows-x64.zip \
+            --draft --title "classiccraft $GITHUB_REF_NAME" \
+            --notes "Built from: $(tr '\n' ';' < stage/classiccraft-linux-x64/VERSIONS.txt)"
