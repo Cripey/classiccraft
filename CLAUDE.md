@@ -1055,6 +1055,10 @@ reference until classiccraft catches up.
    (saved by then) -> MC_QUIT -> WoW closes -> the launcher session ends; the pause button reads "Save and Quit
    Game" (`QuitButtonLabelMixin`, CommonComponents.disconnectButtonLabel). Off with linkedQuit. User-confirmed live
    2026-10-05 (Save and Quit Game closed both).
+   WoW starts after Minecraft is in its world (user: WoW opening over it is the clean picture; whether the minimize
+   shows is unclear - X11 says Iconic/unmapped, the user saw no change): the mod writes `<data dir>/minecraft.status`
+   ("menu"/"world", every 2 s, removed on closing); the launcher's Play waits for a fresh "world" (Enter = start WoW
+   now, `quit` ends), `tools/play.sh` waits only when a fresh status says "menu" (`CC_NOWAIT=1` skips).
    Not tried: hiding (instead of minimizing) the window - may block presenting on Wayland.
 
 ## Session 2026-10-04 (second half) - state at wrap-up

@@ -241,6 +241,7 @@ fn session(
     let mut login = login(inst, db, s)?;
 
     ui::say("");
+    let mut wait_for_minecraft = true;
     match minecraft::launch(inst, s) {
         Ok(Some(true)) => {
             ui::ok("Minecraft launcher started");
@@ -252,14 +253,21 @@ fn session(
             ui::say("\"classiccraft\" profile and press Play. (Its path can be set as \"minecraft_launcher\"");
             ui::say(&format!("in {}.)", inst.data().join("settings.json").display()));
         }
-        Ok(None) => ui::warn(
-            "The Minecraft side isn't installed yet - run setup again once the Minecraft launcher is set up.",
-        ),
+        Ok(None) => {
+            wait_for_minecraft = false;
+            ui::warn(
+                "The Minecraft side isn't installed yet - run setup again once the Minecraft launcher is set up.",
+            );
+        }
         Err(e) => ui::warn(&format!("Couldn't start the Minecraft launcher: {e:#}")),
     }
     match &login.character {
-        Some(name) => ui::say(&format!("WoW opens next and logs in as {name}.")),
-        None => ui::say("WoW opens next and logs in; create your character there."),
+        Some(name) => ui::say(&format!(
+            "WoW opens once Minecraft is in your world, and logs in as {name}."
+        )),
+        None => ui::say(
+            "WoW opens once Minecraft is in your world, and logs in; create your character there.",
+        ),
     }
     ui::say(
         "In the WoW window, ` (backtick) switches between Minecraft controls and WoW's own UI.",
@@ -278,6 +286,10 @@ fn session(
             }
         }
     });
+
+    if wait_for_minecraft && !wait_for_world(&rx, server)? {
+        return Ok(());
+    }
 
     loop {
         login.character = last_character(db, login.account.as_deref());
@@ -318,6 +330,33 @@ fn session(
                 Ok(line) => server.command(line.trim_start_matches('.'))?,
                 Err(_) => return Ok(()),
             }
+        }
+    }
+}
+
+/// Until Minecraft is in its world (the mod's `minecraft.status`, fresh within 6 s, says "world"):
+/// WoW opening over it then is the clean picture. Enter starts WoW anyway; `false` = "quit" typed.
+fn wait_for_world(rx: &mpsc::Receiver<String>, server: &mut Server) -> anyhow::Result<bool> {
+    let Some(status) = crate::weapons::data_dir().map(|d| d.join("minecraft.status")) else {
+        return Ok(true);
+    };
+    ui::say("Waiting for Minecraft to load your world... (Enter starts WoW now)");
+    loop {
+        let fresh = std::fs::metadata(&status)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_some_and(|age| age < Duration::from_secs(6));
+        if fresh && std::fs::read_to_string(&status).is_ok_and(|s| s.trim() == "world") {
+            ui::ok("Minecraft is in the world");
+            return Ok(true);
+        }
+        match rx.recv_timeout(Duration::from_millis(500)) {
+            Ok(line) if line.trim() == "quit" => return Ok(false),
+            Ok(line) if line.trim().is_empty() => return Ok(true),
+            Ok(line) => server.command(line.trim_start_matches('.'))?,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => return Ok(true),
         }
     }
 }

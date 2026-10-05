@@ -13,7 +13,7 @@ use crate::install::Install;
 use crate::ui;
 
 /// The per-user data folder (benilla's link.rs / the mod's McwowLinks.dataDir; keep in step).
-fn data_dir() -> Option<PathBuf> {
+pub fn data_dir() -> Option<PathBuf> {
     if let Some(d) = std::env::var_os("CLASSICCRAFT_DATA_DIR").filter(|d| !d.is_empty()) {
         return Some(PathBuf::from(d));
     }

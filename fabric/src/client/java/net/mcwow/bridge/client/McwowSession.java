@@ -20,6 +20,9 @@ import org.slf4j.LoggerFactory;
  *  - Leaving the world while WoW shows Minecraft closes the game (user, 2026-10-05): the title
  *    screen can't be reached from WoW's window, and plain WoW behind it was a dead end. The pause
  *    menu's button says so (QuitButtonLabelMixin).
+ *  - <data dir>/minecraft.status says "menu" or "world", rewritten every 2 s and removed on closing:
+ *    the launcher's Play and tools/play.sh start WoW only once Minecraft is in its world (user,
+ *    2026-10-05: WoW opening over a Minecraft in its world is the clean picture).
  * Off with "minimizeWindow": false / "linkedQuit": false in config/mcwow.json, or
  * CLASSICCRAFT_MINIMIZE=0 / CLASSICCRAFT_LINKED_QUIT=0.
  */
@@ -37,6 +40,7 @@ public final class McwowSession {
     private static boolean closing;
     /** A world was loaded last tick while WoW showed Minecraft (input bridge on). */
     private static boolean inLinkedWorld;
+    private static int statusIn;
 
     private McwowSession() {
     }
@@ -52,6 +56,10 @@ public final class McwowSession {
         ClientTickEvents.END_CLIENT_TICK.register(McwowSession::tick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {
             if (linkedQuitOn) McwowOverlayLink.markQuitting();
+            try {
+                java.nio.file.Files.deleteIfExists(statusFile());
+            } catch (java.io.IOException ignored) {
+            }
         });
     }
 
@@ -65,7 +73,28 @@ public final class McwowSession {
                 ok ? "requested" : "SDL: " + org.lwjgl.sdl.SDLError.SDL_GetError());
     }
 
+    private static java.nio.file.Path statusFile() {
+        return net.mcwow.bridge.McwowLinks.dataDir().resolve("minecraft.status");
+    }
+
+    /** "world" once a world is loaded and Steve is in it, else "menu"; refreshed every 2 s. */
+    private static void writeStatus(Minecraft mc) {
+        if (--statusIn > 0) return;
+        statusIn = 40;
+        try {
+            java.nio.file.Path f = statusFile();
+            java.nio.file.Files.createDirectories(f.getParent());
+            java.nio.file.Path tmp = f.resolveSibling("minecraft.status.tmp");
+            java.nio.file.Files.writeString(tmp, mc.level != null && mc.player != null ? "world\n" : "menu\n");
+            java.nio.file.Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.io.IOException | RuntimeException e) {
+            // Only a convenience for the launcher; nothing else reads it.
+        }
+    }
+
     private static void tick(Minecraft mc) {
+        writeStatus(mc);
         long now = System.nanoTime();
         boolean linked = McwowOverlayLink.linked();
         if (linked) wowLastSeen = now;
