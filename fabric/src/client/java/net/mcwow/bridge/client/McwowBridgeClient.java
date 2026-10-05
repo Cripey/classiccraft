@@ -1,10 +1,8 @@
 package net.mcwow.bridge.client;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +10,7 @@ import java.util.List;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.mcwow.bridge.McwowGroundState;
+import net.mcwow.bridge.McwowLinks;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -30,7 +29,7 @@ import org.slf4j.LoggerFactory;
 public final class McwowBridgeClient implements ClientModInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger("mcwow-bridge");
 
-    private static final String SHM_PATH = "/dev/shm/classiccraft_v1.shm";
+    private static final String SHM_PATH = McwowLinks.describe("classiccraft_v1.shm");
     private static final int MAGIC = 0x6D637731;
     // v3 (classiccraft): + ground contact, water, velocity, FOV for benilla's movement stream.
     private static final int VERSION = 3;
@@ -70,7 +69,7 @@ public final class McwowBridgeClient implements ClientModInitializer {
     // Opened lazily on first tick, same "Init() once, reuse thereafter" pattern as
     // bridge::Init() on the WoW side - avoids retrying a file open every single tick before
     // WoW is even running.
-    private MappedByteBuffer buf;
+    private ByteBuffer buf;
     private int openRetryTicks;
     private long lastWowHeartbeat, wowSeenNanos;
     private int tickCounter;
@@ -125,7 +124,6 @@ public final class McwowBridgeClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(McwowDeckRide::endTick); // boarded or left one
         McwowGmChat.register(); // "." lines are WoW GM commands
         McwowDance.register(); // /dance [race] [m|f], /dance stop
-        McwowMusicFiles.start(); // the music discs' Ogg files
         ClientTickEvents.END_CLIENT_TICK.register(McwowInteract::tick); // WoW under the crosshair
         ClientTickEvents.END_CLIENT_TICK.register(McwowGather::tick); // gathering WoW objects (after the focus)
         // Chopped WoW trees (McwowTrees), for the chop hint's regrow time.
@@ -416,9 +414,7 @@ public final class McwowBridgeClient implements ClientModInitializer {
         try {
             // Phase 1 bump: READ_WRITE now, not READ_ONLY - this side needs to WRITE the
             // mcCamera slot, not just read wowPlayer.
-            RandomAccessFile raf = new RandomAccessFile(SHM_PATH, "rw");
-            FileChannel ch = raf.getChannel();
-            buf = ch.map(FileChannel.MapMode.READ_WRITE, 0, TOTAL_SIZE);
+            buf = McwowLinks.map("classiccraft_v1.shm", TOTAL_SIZE, true).asByteBuffer();
             buf.order(ByteOrder.LITTLE_ENDIAN);
             buf.putInt(OFF_MC_PID, (int) ProcessHandle.current().pid());
             LOGGER.info("mcwow-bridge: attached to {} (read-write)", SHM_PATH);

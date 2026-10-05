@@ -1,23 +1,20 @@
 package net.mcwow.bridge.combat;
 
 import java.io.IOException;
-import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.VarHandle;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.mcwow.bridge.McwowLinks;
+
 /**
- * Reader of /dev/shm/classiccraft_actors_v1.shm (protocol/mcwow_actors_protocol.h): WoW's creatures near
+ * Reader of the link classiccraft_actors_v1.shm (McwowLinks; protocol/mcwow_actors_protocol.h): WoW's creatures near
  * the player, written by mcwow.dll every frame. Seqlock read; any thread.
  */
 public final class McwowActors {
-    private static final String PATH = "/dev/shm/classiccraft_actors_v1.shm";
+    private static final String NAME = "classiccraft_actors_v1.shm";
     // v2 (classiccraft): + the damage ring after the actors (protocol/mcwow_actors_protocol.h).
     // v3 (2026-10-03): + the text ring (system chat lines, GM command replies).
     private static final int MAGIC = 0x6D637761, VERSION = 7, MAX = 64, ACTOR_BYTES = 80, HEADER_BYTES = 64;
@@ -170,11 +167,8 @@ public final class McwowActors {
     private static MemorySegment segment() {
         if (shm == null && System.nanoTime() >= nextTryNanos) {
             nextTryNanos = System.nanoTime() + 2_000_000_000L;
-            Path p = Path.of(PATH);
-            if (!Files.exists(p)) return null;
-            try (FileChannel ch = FileChannel.open(p, StandardOpenOption.READ)) {
-                if (ch.size() < TOTAL) return null;
-                shm = ch.map(FileChannel.MapMode.READ_ONLY, 0, TOTAL, Arena.global());
+            try {
+                shm = McwowLinks.map(NAME, TOTAL, false); // benilla writes it; read only here
             } catch (IOException | RuntimeException e) {
                 shm = null;
             }

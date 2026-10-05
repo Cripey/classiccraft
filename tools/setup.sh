@@ -39,19 +39,19 @@ distro="${ID:-unknown} ${ID_LIKE:-}"
 if [[ $distro == *debian* || $distro == *ubuntu* ]]; then
   pkgs=(git curl unzip build-essential cmake clang pkg-config libssl-dev zlib1g-dev libmariadb-dev
         libmariadb-dev-compat libasound2-dev libudev-dev mariadb-server-core mariadb-client-core mariadb-client
-        openjdk-25-jdk ffmpeg python3)
+        openjdk-25-jdk python3)
   missing=(); for p in "${pkgs[@]}"; do dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "ok installed" || missing+=("$p"); done
   install=(sh -c "sudo apt-get update && sudo apt-get install -y ${missing[*]:-}")
 elif [[ $distro == *arch* ]]; then
   pkgs=(git curl unzip base-devel cmake clang pkgconf openssl zlib mariadb mariadb-libs alsa-lib
-        systemd-libs jdk-openjdk ffmpeg python)
+        systemd-libs jdk-openjdk python)
   missing=(); for p in "${pkgs[@]}"; do pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p"); done
   install=(sudo pacman -S --needed --noconfirm "${missing[@]}")
 else
   missing=()
   warn "Unknown Linux distribution ($distro). Install the equivalents of: git curl unzip, a C/C++"
   warn "toolchain, cmake, clang, pkg-config, OpenSSL/zlib/MariaDB-client/ALSA/udev development"
-  warn "packages, MariaDB server, Java 25 JDK, ffmpeg and python3 - then press Enter."
+  warn "packages, MariaDB server, Java 25 JDK and python3 - then press Enter."
   read -r
 fi
 if [[ ${#missing[@]} -gt 0 ]]; then

@@ -33,7 +33,7 @@ import org.joml.Vector3f;
  * WoW's race dances on Minecraft's own player (user, 2026-10-03): "/dance" as our WoW character's
  * race and gender, "/dance tauren", "/dance human f", "/dance stop"; moving or jumping ends it. The
  * moves come from the user's own WoW install: benilla extracts each race's dance into Steve's six
- * parts (benilla classiccraft crate dances.rs: ~/.local/share/classiccraft/dances/<race>_<sex>.ccd,
+ * parts (benilla classiccraft crate dances.rs: <data dir>/dances/<race>_<sex>.ccd,
  * and "self" for our own race and gender). A dance goes through the server (McwowDanceNet), so
  * everyone who sees the dancer plays it from their own files.
  */
@@ -150,7 +150,7 @@ public final class McwowDance {
     }
 
     private static Path dir() {
-        return Path.of(System.getProperty("user.home"), ".local", "share", "classiccraft", "dances");
+        return net.mcwow.bridge.McwowLinks.dataDir().resolve("dances");
     }
 
     private static int command(CommandContext<FabricClientCommandSource> c, String race, String gender) {

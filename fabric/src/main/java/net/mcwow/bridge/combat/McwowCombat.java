@@ -86,13 +86,13 @@ public final class McwowCombat {
     private static float gain = 1.0F, takenGain = 2.5F;
     private static long gainReadNanos;
 
-    /** Re-reads /dev/shm/classiccraft_combat (combatgain=, takengain=) at most every 2 s. */
+    /** Re-reads the tuning file classiccraft_combat (McwowLinks.tuningFile: combatgain=, takengain=) at most every 2 s. */
     private static void readTuning() {
         long now = System.nanoTime();
         if (now - gainReadNanos <= 2_000_000_000L) return;
         gainReadNanos = now;
         try {
-            for (String line : java.nio.file.Files.readAllLines(java.nio.file.Path.of("/dev/shm/classiccraft_combat"))) {
+            for (String line : java.nio.file.Files.readAllLines(net.mcwow.bridge.McwowLinks.tuningFile("classiccraft_combat"))) {
                 if (line.startsWith("combatgain=")) gain = Float.parseFloat(line.substring(11).trim());
                 if (line.startsWith("takengain=")) takenGain = Float.parseFloat(line.substring(10).trim());
             }
@@ -104,7 +104,7 @@ public final class McwowCombat {
      * Minecraft damage -> WoW damage: 20 Minecraft damage (a player's full health) = one typical
      * creature's health at {@code level}. The player's hits use their weapon's item level
      * (McwowGear.attackLevel; an iron sword's 6 takes ~30% of a creature of its level), a mob's hits
-     * the creature's own. `combatgain=X` in /dev/shm/classiccraft_combat. Eggs/snowballs (0) do 1: aggro.
+     * the creature's own. `combatgain=X` in the tuning file classiccraft_combat. Eggs/snowballs (0) do 1: aggro.
      */
     public static int wowDamage(float mcDamage, int level) {
         readTuning();

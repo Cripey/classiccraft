@@ -1,12 +1,12 @@
 package net.mcwow.bridge.client;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.lang.foreign.MemorySegment;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 
 import net.mcwow.bridge.McwowGeomStore;
+import net.mcwow.bridge.McwowLinks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 // Abbey blacksmith-yard scene, this consumer's job is just to read them faithfully.
 public final class McwowGeomClient {
     private static final Logger LOGGER = LoggerFactory.getLogger("mcwow-bridge");
-    private static final String SHM_PATH = "/dev/shm/classiccraft_geom_v1.shm";
+    private static final String NAME = "classiccraft_geom_v1.shm";
     private static final int MAGIC = 0x6D636731; // 'mcg1'
     private static final int VERSION = 3; // v2 (2026-10-01): persistent cells + eviction queue; v3: decks
 
@@ -52,7 +52,7 @@ public final class McwowGeomClient {
     private static final int TERRAIN_BYTES = 8 + 256 * 16; // 16-byte columns since outdoor water (2026-10-02)
     private static final int TRI_WALKABLE = 1;
 
-    private static MappedByteBuffer buf;
+    private static ByteBuffer buf;
     private static boolean triedOpen;
     private static long myTail;
     private static boolean everOpened;
@@ -85,7 +85,7 @@ public final class McwowGeomClient {
             }
         }
         everOpened = true;
-        LOGGER.info("mcwow-bridge: geom consumer attached to {}", SHM_PATH);
+        LOGGER.info("mcwow-bridge: geom consumer attached to {}", McwowLinks.describe(NAME));
 
         while (true) {
             try {
@@ -106,10 +106,9 @@ public final class McwowGeomClient {
 
     private static boolean tryOpen() {
         try {
-            RandomAccessFile raf = new RandomAccessFile(SHM_PATH, "rw");
-            FileChannel ch = raf.getChannel();
-            if (raf.length() < TOTAL_BYTES) return false; // geom_server hasn't ftruncate'd yet
-            buf = ch.map(FileChannel.MapMode.READ_WRITE, 0, TOTAL_BYTES);
+            MemorySegment s = McwowLinks.map(NAME, TOTAL_BYTES, false);
+            if (s == null) return false; // benilla hasn't set it up yet
+            buf = s.asByteBuffer();
             buf.order(ByteOrder.LITTLE_ENDIAN);
             if (buf.getInt(OFF_MAGIC) != MAGIC || buf.getInt(OFF_VERSION) != VERSION) {
                 buf = null;
@@ -124,7 +123,7 @@ public final class McwowGeomClient {
 
     /** Tells geom_server a cell was dropped from the store (McwowGeomCache), so it sends it again later. */
     public static synchronized void evict(long cellId) {
-        MappedByteBuffer b = buf;
+        ByteBuffer b = buf;
         if (b == null) return;
         long head = b.getLong((int) OFF_EVICT);
         b.putLong((int) (OFF_EVICT + 16 + (head % EVICT_SLOTS) * 8), cellId);
@@ -133,7 +132,7 @@ public final class McwowGeomClient {
 
     /** benilla's deck poses this frame (seqlocked; null while it writes or before attach). */
     public static java.util.Map<Long, net.mcwow.bridge.McwowDecks.Pose> readDeckPoses() {
-        MappedByteBuffer b = buf;
+        ByteBuffer b = buf;
         if (b == null) return null;
         int seq = b.getInt(OFF_DECKS);
         if ((seq & 1) != 0) return null;
@@ -149,7 +148,7 @@ public final class McwowGeomClient {
 
     /** The rider block: Steve's eye, feet and yaw relative to the deck he stands on (guid 0: none). */
     public static void writeRider(long guid, double[] eye, double[] feet, float yawDeg) {
-        MappedByteBuffer b = buf;
+        ByteBuffer b = buf;
         if (b == null) return;
         int seq = b.getInt(OFF_RIDER);
         b.putInt(OFF_RIDER, seq | 1);
@@ -169,7 +168,7 @@ public final class McwowGeomClient {
 
     /** Ask geom_server for an immediate full republish (e.g. Steve was placed somewhere new). */
     public static void requestRefresh() {
-        MappedByteBuffer b = buf;
+        ByteBuffer b = buf;
         if (b != null) b.putInt(OFF_REFRESH_REQUEST, b.getInt(OFF_REFRESH_REQUEST) + 1);
     }
 

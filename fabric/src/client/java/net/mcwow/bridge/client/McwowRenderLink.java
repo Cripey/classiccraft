@@ -1,15 +1,12 @@
 package net.mcwow.bridge.client;
 
 import java.io.IOException;
-import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 
+import net.mcwow.bridge.McwowLinks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +18,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class McwowRenderLink {
     private static final Logger LOGGER = LoggerFactory.getLogger("mcwow-bridge");
-    private static final String PATH = "/dev/shm/classiccraft_render_v1.shm";
+    private static final String NAME = "classiccraft_render_v1.shm";
     private static final int MAGIC = 0x6D637772, VERSION = 1;
     private static final long RING_OFF = 256, RING_BYTES = 64L << 20;
     private static final long HEAD = 0x00, TAIL = 0x40, DATA = 0x80, DATA_BYTES = RING_BYTES - DATA;
@@ -49,9 +46,8 @@ public final class McwowRenderLink {
     private static MemorySegment segment() {
         if (shm == null && !triedOpen) {
             triedOpen = true;
-            try (FileChannel ch = FileChannel.open(Path.of(PATH), StandardOpenOption.CREATE,
-                    StandardOpenOption.READ, StandardOpenOption.WRITE)) {
-                MemorySegment s = ch.map(FileChannel.MapMode.READ_WRITE, 0, TOTAL, Arena.global());
+            try {
+                MemorySegment s = McwowLinks.map(NAME, TOTAL, true);
                 s.set(ValueLayout.JAVA_INT, OFF_MAGIC, MAGIC);
                 s.set(ValueLayout.JAVA_INT, OFF_VERSION, VERSION);
                 s.set(ValueLayout.JAVA_LONG, RING_OFF + HEAD, 0L);
@@ -60,7 +56,7 @@ public final class McwowRenderLink {
                 // PID last: the reader treats a PID change as "new writer: drop everything, start at head".
                 INT.setRelease(s, OFF_WRITER_PID, (int) ProcessHandle.current().pid());
                 shm = s;
-                LOGGER.info("mcwow-bridge: render link created {} ({} MB)", PATH, TOTAL >> 20);
+                LOGGER.info("mcwow-bridge: render link created {} ({} MB)", McwowLinks.describe(NAME), TOTAL >> 20);
             } catch (IOException | RuntimeException e) {
                 LOGGER.error("mcwow-bridge: render link failed", e);
             }

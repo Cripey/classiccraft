@@ -934,6 +934,19 @@ reference until classiccraft catches up.
    (melee/wand/rifle/blunderbuss, plus `ranged_free_s`, `blunderbuss_free_s`, `pellet_hit`); every report compares
    the four styles over the whole walk. Next: staves (AoE spells, summons).
 
+28. **Windows port, step 1: portability pass** (2026-10-04, user: "go in the order you decided" - 1 portability,
+   2 CI release builds incl. Windows, 3 one cross-platform setup program, 4 Windows server: native VMaNGOS; also the
+   "join a friend's server" path). Shared memory and data paths in ONE place per side: benilla crate `link.rs`, mod
+   `McwowLinks` (keep in step). Linux unchanged (/dev/shm files, ~/.local/share/classiccraft or $XDG_DATA_HOME);
+   Windows = named pagefile-backed mappings `Local\<name>` (kernel32 via FFM in Java) and %APPDATA%\classiccraft;
+   overrides `CLASSICCRAFT_SHM_DIR` / `CLASSICCRAFT_DATA_DIR`; tuning file `classiccraft_combat` via
+   `McwowLinks.tuningFile`. Links are never shrunk (Windows can't resize a mapped file). Music discs: benilla
+   `music.rs` writes the mono Ogg itself (kira decode + vorbis_rs, quality 0.5 = ffmpeg's -q:a 5; same durations) -
+   ffmpeg is no longer needed (dropped from setup.sh). Verified: Linux build + mod build; whole client type-checks for
+   x86_64-pc-windows-gnu (rustup target + mingw-w64 installed in the box; `CARGO_TARGET_DIR=build/wincheck`); the
+   link code both ways Rust<->Java under the host's Wine with a Windows JDK 25 (`build/wincheck/`). OPEN: live run
+   on Linux after the change (user), anything on real Windows.
+
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
   From now on (user, 2026-10-04): commit each logical change as it's done, small commits in whichever repo it touches,

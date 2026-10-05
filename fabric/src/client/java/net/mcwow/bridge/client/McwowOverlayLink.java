@@ -1,15 +1,12 @@
 package net.mcwow.bridge.client;
 
 import java.io.IOException;
-import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.VarHandle;
-import java.nio.channels.FileChannel;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 
 import net.minecraft.client.Minecraft;
+import net.mcwow.bridge.McwowLinks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +18,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class McwowOverlayLink {
     private static final Logger LOGGER = LoggerFactory.getLogger("mcwow-bridge");
-    private static final String PATH = "/dev/shm/classiccraft_overlay_v1.shm";
+    private static final String NAME = "classiccraft_overlay_v1.shm";
 
     private static final int MAGIC = 0x6D636F31; // 'mco1'
     private static final int VERSION = 2; // 2: input ring + inputActive
@@ -55,9 +52,8 @@ public final class McwowOverlayLink {
     private static MemorySegment segment() {
         if (shm == null && !triedOpen) {
             triedOpen = true;
-            try (FileChannel ch = FileChannel.open(Path.of(PATH), StandardOpenOption.CREATE,
-                    StandardOpenOption.READ, StandardOpenOption.WRITE)) {
-                MemorySegment s = ch.map(FileChannel.MapMode.READ_WRITE, 0, TOTAL, Arena.global());
+            try {
+                MemorySegment s = McwowLinks.map(NAME, TOTAL, true);
                 s.set(ValueLayout.JAVA_INT, OFF_MAGIC, MAGIC);
                 s.set(ValueLayout.JAVA_INT, OFF_VERSION, VERSION);
                 s.set(ValueLayout.JAVA_INT, OFF_WRITER_PID, (int) ProcessHandle.current().pid());
@@ -66,7 +62,7 @@ public final class McwowOverlayLink {
                 // Skip anything WoW queued before we attached (stale input from a previous run).
                 s.set(ValueLayout.JAVA_LONG, OFF_INPUT + IR_TAIL, (long) LONG.getVolatile(s, OFF_INPUT + IR_HEAD));
                 shm = s;
-                LOGGER.info("mcwow-bridge: overlay link created {} ({} MB)", PATH, TOTAL >> 20);
+                LOGGER.info("mcwow-bridge: overlay link created {} ({} MB)", McwowLinks.describe(NAME), TOTAL >> 20);
             } catch (IOException | RuntimeException e) {
                 LOGGER.error("mcwow-bridge: overlay link failed", e);
             }

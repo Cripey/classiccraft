@@ -18,7 +18,7 @@ import net.minecraft.world.item.Rarity;
  * WoW music discs (user's pick, 2026-10-03): Tavern (Alliance), Sacred, the main theme and Thunder
  * Bluff, each a disc for Minecraft's jukebox. The songs (data/mcwow/jukebox_song), sounds.json and
  * item models (vanilla discs' looks) are the mod's; the audio is the user's own install's, extracted
- * by benilla (classiccraft crate music.rs) and streamed from ~/.local/share/classiccraft/music
+ * by benilla (classiccraft crate music.rs) and streamed from <data dir>/music
  * (client McwowMusicFiles, SoundBufferLibraryMixin). In the creative Tools & Utilities tab.
  */
 public final class McwowMusic {

@@ -16,12 +16,12 @@ import net.minecraft.server.packs.repository.RepositorySource;
 
 /**
  * The local resource pack of WoW-derived art (2026-10-04: WoW weapon models, McwowWowWeapons) -
- * ~/.local/share/classiccraft/resourcepack, built from the player's own WoW install by
+ * <data dir>/resourcepack (McwowLinks.dataDir), built from the player's own WoW install by
  * tools/wow-weapons.sh, never shipped. Added to Minecraft's resource packs as a required pack on
  * top (PackRepositoryMixin), when it exists.
  */
 public final class McwowLocalPack implements RepositorySource {
-    public static final Path DIR = Path.of(System.getProperty("user.home"), ".local/share/classiccraft/resourcepack");
+    public static final Path DIR = net.mcwow.bridge.McwowLinks.dataDir().resolve("resourcepack");
 
     @Override
     public void loadPacks(Consumer<Pack> out) {
