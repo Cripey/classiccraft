@@ -90,6 +90,7 @@ pub fn run(inst: &Install) -> anyhow::Result<()> {
             };
             server::create_account(inst, &db, &user, &pass)?;
             s.account = Some(user);
+            s.password = Some(pass);
             inst.save_settings(&s)?;
             inst.mark("account", "")?;
         }
@@ -121,9 +122,9 @@ pub fn run(inst: &Install) -> anyhow::Result<()> {
     r?;
     ui::step("All set");
     ui::say(
-        "Pick \"Play\" to start the server and WoW; start Minecraft from its launcher with the",
+        "Pick \"Play\": it starts the server, the Minecraft launcher (press its Play button) and WoW,",
     );
-    ui::say("\"classiccraft\" profile.");
+    ui::say("which logs in by itself.");
     Ok(())
 }
 

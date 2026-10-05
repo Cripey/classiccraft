@@ -15,6 +15,8 @@ pub const EXE: &str = if WINDOWS { ".exe" } else { "" };
 pub struct Settings {
     pub wow_client: Option<PathBuf>,
     pub account: Option<String>,
+    /// The account's password, kept so WoW logs in by itself (the server only listens on this PC).
+    pub password: Option<String>,
     pub db_port: u16,
     pub realm_port: u16,
     pub world_port: u16,
@@ -24,6 +26,8 @@ pub struct Settings {
     pub db_root_pass: String,
     /// The Minecraft launcher's folder, when not the usual one.
     pub minecraft_dir: Option<PathBuf>,
+    /// The Minecraft launcher program, when Play can't find it by itself.
+    pub minecraft_launcher: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -31,6 +35,7 @@ impl Default for Settings {
         Self {
             wow_client: None,
             account: None,
+            password: None,
             db_port: 3307,
             realm_port: 3725,
             world_port: 8086,
@@ -38,6 +43,7 @@ impl Default for Settings {
             db_pass: "mangos".into(),
             db_root_pass: String::new(),
             minecraft_dir: None,
+            minecraft_launcher: None,
         }
     }
 }

@@ -201,6 +201,100 @@ fn add_profile(file: &Path, version_id: &str, game: &Path) -> anyhow::Result<()>
     Ok(())
 }
 
+/// Play (launcher phase 1, 2026-10-05): Minecraft's own launcher, opened on the classiccraft profile
+/// (marked last used, which the launcher selects). The player presses its Play button; the mod then
+/// opens the world by itself. `Ok(None)` when the Minecraft side isn't installed, `Ok(Some(false))`
+/// when no launcher program was found.
+pub fn launch(inst: &Install, s: &crate::install::Settings) -> anyhow::Result<Option<bool>> {
+    let Some(mc) = inst.mark_content("minecraft").map(|m| PathBuf::from(m.trim())) else {
+        return Ok(None);
+    };
+    for file in profile_files(&mc) {
+        if let Err(e) = touch_profile(&file) {
+            ui::warn(&format!("couldn't preselect the profile in {}: {e:#}", file.display()));
+        }
+    }
+    let Some(mut cmd) = launcher_command(s, &mc) else {
+        return Ok(Some(false));
+    };
+    crate::db::detach(&mut cmd);
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .context("starting the Minecraft launcher")?;
+    Ok(Some(true))
+}
+
+/// The classiccraft profile marked as just used (only if it exists).
+fn touch_profile(file: &Path) -> anyhow::Result<()> {
+    let text = std::fs::read_to_string(file)?;
+    let mut data: serde_json::Value = serde_json::from_str(&text)?;
+    let Some(p) = data
+        .get_mut("profiles")
+        .and_then(|p| p.get_mut("classiccraft"))
+        .and_then(|p| p.as_object_mut())
+    else {
+        return Ok(());
+    };
+    p.insert("lastUsed".into(), now_iso().into());
+    std::fs::write(file, serde_json::to_string_pretty(&data)?)?;
+    Ok(())
+}
+
+/// How to start the Minecraft launcher for the folder `mc`: the setting, the Flatpak, the program on
+/// PATH (Linux) or in its usual install folders (Windows), else the Microsoft Store app.
+fn launcher_command(s: &crate::install::Settings, mc: &Path) -> Option<std::process::Command> {
+    use std::process::Command;
+    let default_dir = candidates_default();
+    let with_dir = |exe: &Path| {
+        let mut c = Command::new(exe);
+        if default_dir.as_deref() != Some(mc) {
+            c.arg("--workDir").arg(mc);
+        }
+        c
+    };
+    if let Some(exe) = &s.minecraft_launcher {
+        return Some(with_dir(exe));
+    }
+    if WINDOWS {
+        let mut exes = Vec::new();
+        for var in ["ProgramFiles(x86)", "ProgramFiles"] {
+            if let Some(d) = std::env::var_os(var) {
+                exes.push(PathBuf::from(d).join("Minecraft Launcher").join("MinecraftLauncher.exe"));
+            }
+        }
+        exes.push(PathBuf::from(r"C:\XboxGames\Minecraft Launcher\Content\Minecraft.exe"));
+        if let Some(exe) = exes.iter().find(|e| e.is_file()) {
+            return Some(with_dir(exe));
+        }
+        // The Microsoft Store / Xbox app launcher.
+        let mut c = Command::new("explorer.exe");
+        c.arg(r"shell:AppsFolder\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft");
+        return Some(c);
+    }
+    if mc.to_string_lossy().contains("com.mojang.Minecraft") {
+        let mut c = Command::new("flatpak");
+        c.args(["run", "com.mojang.Minecraft"]);
+        return Some(c);
+    }
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|d| d.join("minecraft-launcher"))
+        .chain([PathBuf::from("/opt/minecraft-launcher/minecraft-launcher")])
+        .find(|p| p.is_file())
+        .map(|exe| with_dir(&exe))
+}
+
+/// The launcher's own default folder (.minecraft in APPDATA or HOME).
+fn candidates_default() -> Option<PathBuf> {
+    if WINDOWS {
+        std::env::var_os("APPDATA").map(|a| PathBuf::from(a).join(".minecraft"))
+    } else {
+        std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".minecraft"))
+    }
+}
+
 /// Now as the launcher writes times: 2026-10-05T12:00:00.000Z.
 fn now_iso() -> String {
     let secs = std::time::SystemTime::now()
@@ -224,4 +318,29 @@ fn now_iso() -> String {
         rem % 3600 / 60,
         rem % 60
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn touching_marks_only_the_classiccraft_profile_last_used() {
+        let dir = std::env::temp_dir().join(format!("cc-launcher-touch-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("launcher_profiles.json");
+        std::fs::write(
+            &file,
+            r#"{"profiles":{"a":{"lastUsed":"2020-01-01T00:00:00.000Z"},
+                "classiccraft":{"lastUsed":"2020-01-01T00:00:00.000Z","name":"classiccraft"}},"version":3}"#,
+        )
+        .unwrap();
+        touch_profile(&file).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        assert_eq!(v["profiles"]["a"]["lastUsed"], "2020-01-01T00:00:00.000Z");
+        assert_ne!(v["profiles"]["classiccraft"]["lastUsed"], "2020-01-01T00:00:00.000Z");
+        assert_eq!(v["profiles"]["classiccraft"]["name"], "classiccraft");
+        assert_eq!(v["version"], 3);
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

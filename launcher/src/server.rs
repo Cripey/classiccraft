@@ -221,7 +221,7 @@ pub fn play(inst: &Install) -> anyhow::Result<()> {
     ui::step("Starting the database and the server");
     db.start()?;
     let mut server = Server::start(inst)?;
-    let r = session(inst, &s, &client, &mut server);
+    let r = session(inst, &db, &s, &client, &mut server);
     ui::say("Stopping the server and the database...");
     server.stop();
     db.stop()?;
@@ -229,22 +229,38 @@ pub fn play(inst: &Install) -> anyhow::Result<()> {
     r
 }
 
-fn session(inst: &Install, s: &Settings, client: &Path, server: &mut Server) -> anyhow::Result<()> {
+fn session(
+    inst: &Install,
+    db: &Db,
+    s: &Settings,
+    client: &Path,
+    server: &mut Server,
+) -> anyhow::Result<()> {
     server.wait_ready()?;
     ui::ok("server running");
-    if !minecraft::installed(inst) {
-        ui::warn(
-            "The Minecraft side isn't installed yet - run setup again once the Minecraft launcher is set up.",
-        );
-    }
+    let mut login = login(inst, db, s)?;
+
     ui::say("");
-    ui::say(
-        "Now start Minecraft: in the Minecraft launcher pick the \"classiccraft\" profile, press Play and",
-    );
-    ui::say(
-        "load your world (first time: Create New World > World Type: Superflat > Customize > Presets >",
-    );
-    ui::say("\"The Void\"). WoW opens next; log in with your account and enter the world.");
+    match minecraft::launch(inst, s) {
+        Ok(Some(true)) => {
+            ui::ok("Minecraft launcher started");
+            ui::say("In the Minecraft launcher, press Play (the \"classiccraft\" profile is selected). Your");
+            ui::say("world opens by itself (the first time a new one is made).");
+        }
+        Ok(Some(false)) => {
+            ui::warn("The Minecraft launcher program wasn't found - start it yourself, pick the");
+            ui::say("\"classiccraft\" profile and press Play. (Its path can be set as \"minecraft_launcher\"");
+            ui::say(&format!("in {}.)", inst.data().join("settings.json").display()));
+        }
+        Ok(None) => ui::warn(
+            "The Minecraft side isn't installed yet - run setup again once the Minecraft launcher is set up.",
+        ),
+        Err(e) => ui::warn(&format!("Couldn't start the Minecraft launcher: {e:#}")),
+    }
+    match &login.character {
+        Some(name) => ui::say(&format!("WoW opens next and logs in as {name}.")),
+        None => ui::say("WoW opens next and logs in; create your character there."),
+    }
     ui::say(
         "In the WoW window, ` (backtick) switches between Minecraft controls and WoW's own UI.",
     );
@@ -264,7 +280,8 @@ fn session(inst: &Install, s: &Settings, client: &Path, server: &mut Server) -> 
     });
 
     loop {
-        let mut wow = start_client(inst, s, client)?;
+        login.character = last_character(db, login.account.as_deref());
+        let mut wow = start_client(inst, s, client, &login)?;
         ui::ok("WoW started");
         let quit = loop {
             if let Some(st) = wow.try_wait()? {
@@ -300,11 +317,75 @@ fn session(inst: &Install, s: &Settings, client: &Path, server: &mut Server) -> 
     }
 }
 
-fn start_client(inst: &Install, s: &Settings, client: &Path) -> anyhow::Result<Child> {
+/// Who WoW logs in as: the saved account and password, and the character played last.
+struct Login {
+    account: Option<String>,
+    password: Option<String>,
+    character: Option<String>,
+}
+
+/// The saved login; an install from before 2026-10-05 has no saved password, so it's asked once.
+fn login(inst: &Install, db: &Db, s: &Settings) -> anyhow::Result<Login> {
+    let account = s
+        .account
+        .clone()
+        .filter(|a| !a.is_empty() && a.chars().all(|c| c.is_ascii_alphanumeric()));
+    let mut password = s.password.clone();
+    if let (Some(user), None) = (&account, &password) {
+        ui::say(&format!(
+            "WoW can log in by itself: type the password of your account {user} once (it's saved in"
+        ));
+        ui::say(&format!(
+            "{}), or just press Enter to log in by hand.",
+            inst.data().join("settings.json").display()
+        ));
+        let p = ui::ask_password("Password:")?;
+        if !p.is_empty() {
+            let mut saved = inst.settings();
+            saved.password = Some(p.clone());
+            inst.save_settings(&saved)?;
+            password = Some(p);
+        }
+    }
+    let character = last_character(db, account.as_deref());
+    Ok(Login {
+        account,
+        password,
+        character,
+    })
+}
+
+/// The account's character logged out last; none yet = WoW's character screen, to make one.
+fn last_character(db: &Db, account: Option<&str>) -> Option<String> {
+    let user = account?;
+    db.query(
+        Some("characters"),
+        &format!(
+            "SELECT c.name FROM characters c JOIN realmd.account a ON a.id = c.account \
+             WHERE a.username = UPPER('{user}') ORDER BY c.logout_time DESC, c.guid DESC LIMIT 1"
+        ),
+    )
+    .ok()
+    .filter(|n| !n.is_empty())
+}
+
+fn start_client(
+    inst: &Install,
+    s: &Settings,
+    client: &Path,
+    login: &Login,
+) -> anyhow::Result<Child> {
     let log = std::fs::File::create(inst.run_dir().join("classiccraft.log"))?;
     let exe = inst.client_exe();
-    Command::new(&exe)
-        .current_dir(exe.parent().expect("in client/"))
+    let mut cmd = Command::new(&exe);
+    // Auto-login (benilla: both WOW_USER and WOW_PASS), straight into the world as WOW_CHAR.
+    if let (Some(user), Some(pass)) = (&login.account, &login.password) {
+        cmd.env("WOW_USER", user).env("WOW_PASS", pass);
+        if let Some(name) = &login.character {
+            cmd.env("WOW_CHAR", name);
+        }
+    }
+    cmd.current_dir(exe.parent().expect("in client/"))
         .env("WOW_DATA", client.join("Data"))
         .env("WOW_HOST", format!("127.0.0.1:{}", s.realm_port))
         .stdin(Stdio::null())
