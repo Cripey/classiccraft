@@ -42,9 +42,10 @@ Everything runs on your own PC, offline, just for you.
    private MariaDB and the server database, extracts the server's map data from your WoW client
    (15-30 minutes), creates your account and adds the **classiccraft** profile to the Minecraft
    launcher. If something fails, start the launcher again; it carries on where it stopped.
-4. Then pick **Play** in the launcher: it starts the server and WoW. Start Minecraft from its
-   launcher with the **classiccraft** profile (see Play below). **Update** in the launcher gets
-   the newest release.
+4. Then pick **Play** in the launcher: it starts the server, opens the Minecraft launcher with the
+   **classiccraft** profile selected (press its Play button - your world opens by itself, the first
+   time a new one is made) and starts WoW, which logs in by itself as the character you played last.
+   **Update** in the launcher gets the newest release.
 
 ## Install from source (Linux, for development)
 
@@ -69,13 +70,15 @@ If something fails, fix the cause and run `tools/setup.sh` again; it continues w
 
 ## Play
 
-With a release, the launcher's **Play** does steps 1, 3 and 4 (type `quit` in it when you're done).
+With a release, the launcher's **Play** does all of this (type `quit` in it when you're done).
 From source:
 
 1. Start the server: `tools/server.sh start`
-2. In the Minecraft launcher, pick the **classiccraft** profile and press Play. Create a world:
-   *Create New World > World Type: Superflat > Customize > Presets > The Void*, and load it.
-3. Start WoW: `tools/play.sh`, log in and enter the world. Steve appears where your character is.
+2. In the Minecraft launcher, pick the **classiccraft** profile and press Play. The world you played
+   last opens by itself; with none yet, a Void world named "classiccraft" is made (`"autoWorld": false`
+   in the game folder's `config/mcwow.json` turns this off).
+3. Start WoW: `tools/play.sh` (`WOW_USER`, `WOW_PASS`, `WOW_CHAR` log in by themselves), log in and
+   enter the world. Steve appears where your character is.
 4. When you're done: `tools/server.sh stop`
 
 ### Controls

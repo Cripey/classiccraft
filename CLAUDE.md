@@ -1024,6 +1024,19 @@ reference until classiccraft catches up.
    at the rank call sites (ring, reputation pane, unit tooltip, item feed). The stored race still picks model and
    dances. Not done: quests that kill the other faction's NPCs, per-faction twin quests, UnitFactionGroup in the UI.
 
+32. **Launcher phase 1: fewer steps to play** (2026-10-05, user; OPEN: test live - needs the new launcher and mod).
+   Launcher Play: `minecraft::launch` marks the classiccraft profile `lastUsed` (the launcher selects it) and starts
+   Minecraft's launcher (setting `minecraft_launcher`, Flatpak, `minecraft-launcher` on PATH /
+   /opt/minecraft-launcher; Windows MinecraftLauncher.exe in Program Files, C:\XboxGames, else the Store app via
+   `explorer.exe shell:AppsFolder\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft`; `--workDir` for a non-default
+   folder) - the player still presses its Play (Microsoft login). WoW gets `WOW_USER`/`WOW_PASS` (settings.json
+   `password`, saved by setup; older installs are asked once at Play, Enter = log in by hand) and `WOW_CHAR` = the
+   account's character with the latest `logout_time` (re-read each WoW start; none = character screen). Mod
+   `McwowAutoWorld`: first title screen of a session opens the most recently played usable world, or creates
+   "classiccraft" (survival, commands on, flat preset with THE_VOID's settings); off with `"autoWorld": false` in
+   `config/mcwow.json` or `CLASSICCRAFT_AUTO_WORLD=0`. Phase 2 (not started): hide Minecraft's window, linked
+   shutdown; later maybe zero-click Minecraft (own Microsoft login or Prism).
+
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
   From now on (user, 2026-10-04): commit each logical change as it's done, small commits in whichever repo it touches,
