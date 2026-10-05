@@ -988,6 +988,13 @@ reference until classiccraft catches up.
    Second try: extraction finished; the account step failed: the MariaDB 11.8 client (Windows, TCP) insists on TLS
    and rejected the server's self-made certificate (CERT_E_EXPIRED - likely the dual-boot clock). db.rs passes
    `--skip-ssl` on Windows (loopback only). Fixed launcher copied into the user's test folder.
+   Third try: setup done, played (kills, XP drops fine), then kicked to the login screen: vmangos AntiFlood
+   (`WorldSession::AllowPacket`: > 300 packets in one session update) on 301 MSG_MOVE_SET_FACING - benilla sends one per
+   frame the facing changes, Windows ran uncapped, and a server stall piled them up. benilla `movement_net.rs`:
+   SET_FACING at most every 50 ms (`FACING_INTERVAL`, `Player::last_facing_sent`), a held-back change goes out on the
+   next due frame (test `facing_reports_are_rate_limited_and_the_last_one_is_owed`). Server logs to read on Windows:
+   `data/run/logs/Anticheat.log`, `Network.log`, `data/run/mangosd.out`, `classiccraft.log` (client). Something on the
+   user's Windows probes 127.0.0.1:8086 with HTTP ("malformed packet ... cmd = 1999577172" = "T /w") - harmless.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
