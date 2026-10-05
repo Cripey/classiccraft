@@ -455,6 +455,10 @@ reference until classiccraft catches up.
    client picks by weight, plays min + rand(max - min) times (>= 1), picks again, seeded by the
    server (payload `seed`) so viewers agree. Elytra (`ElytraModelDanceMixin`, root turn) and armor
    (`HumanoidModelDanceMixin`, full pose, non-PlayerModel) follow; the cape model is a PlayerModel.
+   Commands since 2026-10-05 (user; OPEN: test): `/dance` = a random race + gender (picked by the dancer, sent as
+   that race/sex), `/dance <race>` = random gender, `/dance <race> m|f`, `/dance all` = payload race 255: every
+   available race+gender clip in a seeded shuffled order, the next clip after each variation run, reshuffled per
+   round (viewers walk the same order from the server's seed). The "self" file is no longer read.
 13e. **WoW music discs** (2026-10-03; OPEN: test). Four discs (user's pick): Tavern (Alliance)
    `TavernAlliance01`, Sacred `Sacred01`, Main Theme `wow_main_theme`, Thunder Bluff `Thunderbluff
    Walking 03`. benilla crate `music.rs` extracts the MP3s once to `~/.local/share/classiccraft/
