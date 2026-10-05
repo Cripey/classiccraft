@@ -14,7 +14,7 @@ use crate::install::{EXE, Install, Settings, conf_path};
 use crate::{minecraft, ui};
 
 /// Bumped when `write_configs` changes what it writes; setup and update rewrite the configs then.
-pub const CONFIG_VERSION: &str = "1";
+pub const CONFIG_VERSION: &str = "2";
 
 /// mangosd.conf / realmd.conf in data/etc from the bundle's .dist defaults plus ours (ports, DB
 /// login, paths, 2x XP), as tools/server-config.sh. Old files are kept as .conf.bak.
@@ -44,6 +44,8 @@ pub fn write_configs(inst: &Install, s: &Settings) -> anyhow::Result<()> {
     for r in ["Kill", "Kill.Elite", "Quest", "Explore"] {
         m.push((format!("Rate.XP.{r}"), "2".into()));
     }
+    // Players are game masters (GM commands from Minecraft chat), but not immortal (user, 2026-10-05).
+    m.push(("GM.CheatGod".into(), "0".into()));
     let r: Vec<(String, String)> = vec![
         ("LoginDatabaseInfo".into(), db("realmd")),
         ("LogsDir".into(), q(&logs)),
@@ -165,7 +167,8 @@ pub fn create_account(inst: &Install, db: &Db, user: &str, pass: &str) -> anyhow
     let r = (|| -> anyhow::Result<()> {
         server.wait_ready()?;
         server.command(&format!("account create {user} {pass}"))?;
-        server.command(&format!("account set gmlevel {user} 3"))?;
+        // The account row is written in the background; the GM level goes in once it's there
+        // (a console "account set gmlevel" sent right after the create found no account yet).
         let t0 = Instant::now();
         while t0.elapsed() < Duration::from_secs(10) {
             let n = db.query(
@@ -173,7 +176,7 @@ pub fn create_account(inst: &Install, db: &Db, user: &str, pass: &str) -> anyhow
                 &format!("SELECT COUNT(*) FROM account WHERE username=UPPER('{user}')"),
             )?;
             if n == "1" {
-                return Ok(());
+                return grant_gm(db, user);
             }
             std::thread::sleep(Duration::from_millis(500));
         }
@@ -184,6 +187,27 @@ pub fn create_account(inst: &Install, db: &Db, user: &str, pass: &str) -> anyhow
     })();
     server.stop();
     r
+}
+
+/// GM level 3 on every realm for `user` (classiccraft uses GM commands from Minecraft chat),
+/// written straight into `account_access` and checked. Idempotent; the server reads it at login.
+pub fn grant_gm(db: &Db, user: &str) -> anyhow::Result<()> {
+    db.query(
+        Some("realmd"),
+        &format!(
+            "REPLACE INTO account_access (id, gmlevel, RealmID) \
+             SELECT id, 3, -1 FROM account WHERE username=UPPER('{user}')"
+        ),
+    )?;
+    let level = db.query(
+        Some("realmd"),
+        &format!(
+            "SELECT aa.gmlevel FROM account a JOIN account_access aa ON aa.id = a.id \
+             WHERE a.username=UPPER('{user}') AND aa.RealmID = -1"
+        ),
+    )?;
+    anyhow::ensure!(level == "3", "giving {user} game master rights failed");
+    Ok(())
 }
 
 /// A play session: database, server, the WoW client; server console on stdin until the player quits.

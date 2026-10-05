@@ -995,6 +995,12 @@ reference until classiccraft catches up.
    next due frame (test `facing_reports_are_rate_limited_and_the_last_one_is_owed`). Server logs to read on Windows:
    `data/run/logs/Anticheat.log`, `Network.log`, `data/run/mangosd.out`, `classiccraft.log` (client). Something on the
    user's Windows probes 127.0.0.1:8086 with HTTP ("malformed packet ... cmd = 1999577172" = "T /w") - harmless.
+   GM rights + god mode (user, 2026-10-05): the console's "account set gmlevel" went out right after "account create",
+   whose row is written in the background, so it found no account and the player had no GM commands. server.rs
+   `grant_gm`: REPLACE INTO account_access (id, 3, RealmID -1) once the row exists, verified; setup re-applies it for
+   the saved account every run (repairs older installs). Launcher confs now `GM.CheatGod = 0` (players are GMs but
+   mortal); CONFIG_VERSION 2, so existing installs rewrite their confs (the menu reruns setup). The dev path
+   (tools/server-config.sh, CheatGod 1) is unchanged.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.

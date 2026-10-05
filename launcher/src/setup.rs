@@ -93,6 +93,10 @@ pub fn run(inst: &Install) -> anyhow::Result<()> {
             inst.save_settings(&s)?;
             inst.mark("account", "")?;
         }
+        // Accounts made by older launchers missed their GM level (2026-10-05).
+        if let Some(user) = &s.account {
+            server::grant_gm(&db, user)?;
+        }
         ui::ok(&format!(
             "account {}",
             s.account.as_deref().unwrap_or("(created)")
