@@ -3,12 +3,21 @@
 # Inside a distrobox it runs on the HOST: there, wgpu's vkCreateDevice fails on a passed-through
 # NVIDIA driver (RequestDeviceError Device(Lost)) even though vkcube works, while the same binary
 # runs fine natively (2026-10-02). Network and /dev/shm are shared, so nothing else changes.
-# Usage: tools/play.sh   (env: WOW_USER, WOW_PASS, WOW_CHAR, WOW_* passed through; WOW_CLIENT, also
+# Usage: tools/play.sh [--new] [Character]   (env: WOW_USER, WOW_PASS, WOW_CHAR, WOW_* passed through; WOW_CLIENT, also
 #        from tools/local.env; CC_BIN=benilla for stock benilla, default classiccraft = benilla +
 #        the Minecraft bridge; CC_NOBUILD=1 skips the build; CC_NOWAIT=1 doesn't wait for a running
 #        Minecraft to reach its world)
 set -euo pipefail
 . "$(dirname "$0")/config.sh"
+
+# tools/play.sh [--new] [Character]: log in as that character (WOW_CHAR); --new creates it first
+# when the account doesn't have it (a Blockborn: WOW_CREATE_CHAR). Pair with tools/minecraft.sh
+# <Character>, which opens that character's world.
+if [[ ${1:-} == --new ]]; then new=1; shift; else new=""; fi
+if [[ $# -gt 0 ]]; then
+  export WOW_CHAR="$1"
+  [[ -n $new ]] && export WOW_CREATE_CHAR="$1"
+fi
 root="$CC_ROOT"
 
 client="${WOW_CLIENT:?set WOW_CLIENT to the WoW 1.12.1 client directory (or run tools/setup.sh)}"
