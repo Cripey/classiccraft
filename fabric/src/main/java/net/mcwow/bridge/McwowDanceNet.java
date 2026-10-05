@@ -20,8 +20,8 @@ public final class McwowDanceNet {
     }
 
     /**
-     * A dance: the dancer's entity id (unused going up), ChrRaces id (0 = stop), sex (0 m, 1 f), and
-     * the seed of its variation rolls (the server picks it), so every viewer sees the same order.
+     * A dance: the dancer's entity id (unused going up), ChrRaces id (0 = stop, 255 = every race in
+     * turn, "/dance all"), sex (0 m, 1 f), and the seed of its variation rolls (the server picks it), so every viewer sees the same order.
      */
     public record Dance(int entity, int race, int sex, int seed) implements CustomPacketPayload {
         public static final Type<Dance> TYPE = new Type<>(Identifier.fromNamespaceAndPath("mcwow", "dance"));

@@ -30,8 +30,10 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 /**
- * WoW's race dances on Minecraft's own player (user, 2026-10-03): "/dance" as our WoW character's
- * race and gender, "/dance tauren", "/dance human f", "/dance stop"; moving or jumping ends it. The
+ * WoW's race dances on Minecraft's own player (user, 2026-10-03): "/dance" picks a race and gender at
+ * random (2026-10-05: every character is the neutral Minecraft race, so its WoW race means nothing),
+ * "/dance tauren" (random gender), "/dance human f", "/dance all" (every race and gender's dance in
+ * turn, a shuffled cycle), "/dance stop"; moving or jumping ends it. The
  * moves come from the user's own WoW install: benilla extracts each race's dance into Steve's six
  * parts (benilla classiccraft crate dances.rs: <data dir>/dances/<race>_<sex>.ccd,
  * and "self" for our own race and gender). A dance goes through the server (McwowDanceNet), so
@@ -43,7 +45,11 @@ public final class McwowDance {
             Map.entry("human", 1), Map.entry("orc", 2), Map.entry("dwarf", 3), Map.entry("nightelf", 4),
             Map.entry("elf", 4), Map.entry("undead", 5), Map.entry("forsaken", 5), Map.entry("scourge", 5),
             Map.entry("tauren", 6), Map.entry("gnome", 7), Map.entry("troll", 8));
-    private static final String[] SUGGESTED = {"human", "orc", "dwarf", "nightelf", "undead", "tauren", "gnome", "troll", "stop"};
+    private static final String[] SUGGESTED = {"human", "orc", "dwarf", "nightelf", "undead", "tauren", "gnome", "troll", "all", "stop"};
+    /** Race names for the feedback line, by ChrRaces id. */
+    private static final String[] RACE_NAMES = {"", "Human", "Orc", "Dwarf", "Night Elf", "Undead", "Tauren", "Gnome", "Troll"};
+    /** The Dance payload's race for "/dance all" (0 stops, 1-8 one race). */
+    private static final int ALL = 255;
     private static final int FLOATS = 17;
     /** Steve's hip, the point the root turns about (model pixels under the root's origin, the neck). */
     private static final Vector3f HIP = new Vector3f(0.0F, 12.0F, 0.0F);
@@ -60,29 +66,43 @@ public final class McwowDance {
     }
 
     /**
-     * Who dances: the clip, the entity's age (ticks) when it began, and the walk through its
-     * variations - WoW picks one by weight, plays it a rolled number of times, picks again. Seeded
-     * by the server, so every viewer walks the same order.
+     * Who dances: the clips, the entity's age (ticks) when it began, and the walk through their
+     * variations - WoW picks one by weight, plays it a rolled number of times, picks again. One clip
+     * for a race's dance; "/dance all" holds every race and gender's and moves to the next after each
+     * variation's run, through a shuffled order (reshuffled each round). Seeded by the server, so every
+     * viewer walks the same order.
      */
     private static final class Active {
-        final Clip clip;
+        final java.util.List<Clip> clips;
+        final boolean cycle;
         final float startAge;
         final java.util.Random rng;
+        int clipIndex;
         Variation current;
         float segmentStart, segmentLength;
 
-        Active(Clip clip, float startAge, int seed) {
-            this.clip = clip;
+        Active(java.util.List<Clip> clips, boolean cycle, float startAge, int seed) {
+            this.clips = new java.util.ArrayList<>(clips);
+            this.cycle = cycle;
             this.startAge = startAge;
             this.rng = new java.util.Random(seed);
+            if (cycle) java.util.Collections.shuffle(this.clips, this.rng);
             this.next(0.0F);
         }
 
-        /** The next variation from `at` seconds: weighted pick, replays min + rand * (max - min). */
+        /**
+         * The next variation from `at` seconds: weighted pick, replays min + rand * (max - min); when
+         * cycling, from the next clip in the order.
+         */
         void next(float at) {
-            int roll = this.rng.nextInt(this.clip.totalWeight());
-            Variation pick = this.clip.variations()[0];
-            for (Variation v : this.clip.variations()) {
+            if (this.cycle && this.current != null && ++this.clipIndex >= this.clips.size()) {
+                this.clipIndex = 0;
+                java.util.Collections.shuffle(this.clips, this.rng);
+            }
+            Clip clip = this.clips.get(this.clipIndex);
+            int roll = this.rng.nextInt(clip.totalWeight());
+            Variation pick = clip.variations()[0];
+            for (Variation v : clip.variations()) {
                 if (roll < v.weight()) {
                     pick = v;
                     break;
@@ -144,8 +164,15 @@ public final class McwowDance {
             }
             Minecraft mc = Minecraft.getInstance();
             Entity e = mc.level == null ? null : mc.level.getEntity(dance.entity());
+            if (e == null) return;
+            if (dance.race() == ALL) {
+                java.util.List<Clip> all = new java.util.ArrayList<>();
+                for (int[] k : available()) all.add(clip(k[0], k[1]));
+                if (!all.isEmpty()) DANCING.put(dance.entity(), new Active(all, true, e.tickCount, dance.seed()));
+                return;
+            }
             Clip clip = clip(dance.race(), dance.sex());
-            if (e != null && clip != null) DANCING.put(dance.entity(), new Active(clip, e.tickCount, dance.seed()));
+            if (clip != null) DANCING.put(dance.entity(), new Active(java.util.List.of(clip), false, e.tickCount, dance.seed()));
         });
     }
 
@@ -158,26 +185,44 @@ public final class McwowDance {
             ClientPlayNetworking.send(new McwowDanceNet.Dance(0, 0, 0, 0));
             return 1;
         }
-        int[] own = self();
+        java.util.List<int[]> available = available();
+        if (available.isEmpty()) {
+            c.getSource().sendError(Component.literal("No dance files yet: benilla writes them to " + dir() + " on start."));
+            return 0;
+        }
+        if (race != null && race.equalsIgnoreCase("all")) {
+            ClientPlayNetworking.send(new McwowDanceNet.Dance(0, ALL, 0, 0));
+            c.getSource().sendFeedback(Component.literal("Dancing every race's dance (" + available.size()
+                    + ") in turn - move or jump to stop. Third person (F5) to watch."));
+            return 1;
+        }
+        java.util.Random rng = new java.util.Random();
         int raceId;
         if (race == null) {
-            if (own == null) {
-                c.getSource().sendError(Component.literal("Your WoW character's race isn't known yet (benilla in world?)."));
-                return 0;
-            }
-            raceId = own[0];
+            // Any race and gender: the gender is picked with the race.
+            int[] pick = available.get(rng.nextInt(available.size()));
+            raceId = pick[0];
+            if (gender == null) gender = pick[1] == 0 ? "m" : "f";
         } else {
             Integer id = RACES.get(race.toLowerCase(Locale.ROOT));
             if (id == null) {
                 c.getSource().sendError(Component.literal("Unknown race \"" + race
-                        + "\": human, orc, dwarf, nightelf, undead, tauren, gnome or troll."));
+                        + "\": human, orc, dwarf, nightelf, undead, tauren, gnome, troll, all or stop."));
                 return 0;
             }
             raceId = id;
         }
         int sex;
         if (gender == null) {
-            sex = own != null ? own[1] : 0;
+            // A race without a gender: either of its dances that exists.
+            java.util.List<Integer> sexes = new java.util.ArrayList<>();
+            for (int[] k : available) if (k[0] == raceId) sexes.add(k[1]);
+            if (sexes.isEmpty()) {
+                c.getSource().sendError(Component.literal("No dance file for that race yet: benilla writes them to "
+                        + dir() + " on start."));
+                return 0;
+            }
+            sex = sexes.get(rng.nextInt(sexes.size()));
         } else {
             switch (gender.toLowerCase(Locale.ROOT)) {
                 case "m", "male" -> sex = 0;
@@ -194,18 +239,20 @@ public final class McwowDance {
             return 0;
         }
         ClientPlayNetworking.send(new McwowDanceNet.Dance(0, raceId, sex, 0));
-        c.getSource().sendFeedback(Component.literal("Dancing - move or jump to stop. Third person (F5) to watch."));
+        c.getSource().sendFeedback(Component.literal("Dancing as a " + RACE_NAMES[raceId] + (sex == 0 ? " male" : " female")
+                + " - move or jump to stop. Third person (F5) to watch."));
         return 1;
     }
 
-    /** Our WoW character's race and sex, from benilla's "self" file. */
-    private static int[] self() {
-        try {
-            String[] p = Files.readString(dir().resolve("self")).trim().split("\\s+");
-            return new int[] {Integer.parseInt(p[0]), Integer.parseInt(p[1])};
-        } catch (IOException | RuntimeException e) {
-            return null;
+    /** Every race and gender with a readable dance file, as {race, sex}, in race order. */
+    private static java.util.List<int[]> available() {
+        java.util.List<int[]> out = new java.util.ArrayList<>();
+        for (int race = 1; race < RACE_NAMES.length; race++) {
+            for (int sex = 0; sex < 2; sex++) {
+                if (clip(race, sex) != null) out.add(new int[] {race, sex});
+            }
         }
+        return out;
     }
 
     private static Clip clip(int race, int sex) {
