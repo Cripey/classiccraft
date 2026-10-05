@@ -21,14 +21,16 @@ if [[ -z ${CC_NOBUILD:-} ]]; then
   (cd "$root/benilla" && cargo build --profile play -p "$bin")
 fi
 
-# A Minecraft that is running but still on its menus: start WoW once it's in its world (WoW opening
-# over it is the clean picture). The mod rewrites minecraft.status every 2 s; no fresh file = no
-# Minecraft, no wait. CC_NOWAIT=1 skips this.
+# A Minecraft starting up (tools/minecraft.sh: Gradle's runClient, then the game) or still on its
+# menus: start WoW once it's in its world (WoW opening over it is the clean picture). The mod
+# rewrites minecraft.status every 2 s. No Minecraft = no wait; CC_NOWAIT=1 skips this.
 status="${CLASSICCRAFT_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/classiccraft}/minecraft.status"
 fresh() { [[ -f $status ]] && (( $(date +%s) - $(stat -c %Y "$status") < 6 )); }
-if [[ -z ${CC_NOWAIT:-} ]] && fresh && [[ $(<"$status") != world ]]; then
+in_world() { fresh && [[ $(<"$status") == world ]]; }
+mc_running() { fresh || pgrep -f '[G]radleWrapperMain runClient' >/dev/null || pgrep -f '[d]evlaunchinjector.Main' >/dev/null; }
+if [[ -z ${CC_NOWAIT:-} ]] && mc_running && ! in_world; then
   echo "Waiting for Minecraft to load its world... (Ctrl-C to stop, CC_NOWAIT=1 to skip)"
-  while fresh && [[ $(<"$status") != world ]]; do sleep 0.5; done
+  while mc_running && ! in_world; do sleep 0.5; done
 fi
 
 # Pass every WOW_*/BENILLA_*/RUST_LOG variable through (needed for the host process).

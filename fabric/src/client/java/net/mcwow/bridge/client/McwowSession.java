@@ -9,8 +9,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * One game, not two windows (launcher phase 2, 2026-10-05):
- *  - Minecraft's window is minimized once WoW shows Minecraft (WoW reads the overlay, its input
- *    bridge is on, a world is loaded) - everything Minecraft draws is in WoW's window then. It comes
+ *  - Minecraft's window is minimized once WoW runs (it reads the overlay) and a world is loaded - everything Minecraft draws is in WoW's window then. It comes
  *    back when WoW has been gone for a few seconds (closed or crashed), so Minecraft is never left
  *    running out of sight. Minimized, not hidden: WindowMixin keeps Minecraft rendering at full
  *    rate while "iconified" (SkyCraft's own way), a path hiding hasn't been tried on.
@@ -100,7 +99,9 @@ public final class McwowSession {
         if (linked) wowLastSeen = now;
 
         if (minimizeOn) {
-            boolean shown = linked && McwowOverlayLink.inputActive() && mc.level != null && mc.player != null;
+            // WoW running (reading the overlay) and a world loaded - not WoW's input bridge, which is
+            // off while Minecraft's own window has focus (it opened over WoW: 2026-10-05).
+            boolean shown = linked && mc.level != null && mc.player != null;
             if (shown && !minimized) {
                 minimized = true;
                 triesLeft = 3;

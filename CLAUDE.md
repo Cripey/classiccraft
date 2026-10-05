@@ -1058,7 +1058,9 @@ reference until classiccraft catches up.
    WoW starts after Minecraft is in its world (user: WoW opening over it is the clean picture; whether the minimize
    shows is unclear - X11 says Iconic/unmapped, the user saw no change): the mod writes `<data dir>/minecraft.status`
    ("menu"/"world", every 2 s, removed on closing); the launcher's Play waits for a fresh "world" (Enter = start WoW
-   now, `quit` ends), `tools/play.sh` waits only when a fresh status says "menu" (`CC_NOWAIT=1` skips).
+   now, `quit` ends), `tools/play.sh` waits while a dev Minecraft is starting (`GradleWrapperMain runClient` /
+   `devlaunchinjector.Main` running) or a fresh status says "menu" (`CC_NOWAIT=1` skips). The minimize no longer
+   needs WoW's input bridge on (off while Minecraft's window has focus - it never fired when MC opened over WoW).
    Not tried: hiding (instead of minimizing) the window - may block presenting on Wayland.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
