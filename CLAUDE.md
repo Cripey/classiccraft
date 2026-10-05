@@ -1053,7 +1053,8 @@ reference until classiccraft catches up.
    Leaving the world while WoW shows Minecraft closes the game (user: the title screen can't be reached from
    WoW's window and plain WoW behind it was a dead end): `McwowSession` stops Minecraft once the level is gone
    (saved by then) -> MC_QUIT -> WoW closes -> the launcher session ends; the pause button reads "Save and Quit
-   Game" (`QuitButtonLabelMixin`, CommonComponents.disconnectButtonLabel). Off with linkedQuit.
+   Game" (`QuitButtonLabelMixin`, CommonComponents.disconnectButtonLabel). Off with linkedQuit. User-confirmed live
+   2026-10-05 (Save and Quit Game closed both).
    Not tried: hiding (instead of minimizing) the window - may block presenting on Wayland.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
