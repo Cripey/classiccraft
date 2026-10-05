@@ -946,6 +946,14 @@ reference until classiccraft catches up.
    x86_64-pc-windows-gnu (rustup target + mingw-w64 installed in the box; `CARGO_TARGET_DIR=build/wincheck`); the
    link code both ways Rust<->Java under the host's Wine with a Windows JDK 25 (`build/wincheck/`). Linux live run
    user-confirmed 2026-10-04 (all links, dances, weapon pack, discs re-encoded, waygate sound). OPEN: real Windows.
+29. **Windows port, step 2: release builds** (2026-10-05). `.github/workflows/release.yml` (classiccraft repo): one
+   snapshot of all three repos (inputs benilla_ref/vmangos_ref, default main/development) -> `classiccraft-linux-x64.tar.gz`
+   / `classiccraft-windows-x64.zip`: client/ (classiccraft, cc_weapon; ship profile), server/ (bin, etc/*.conf.dist;
+   Linux libs bundled by VMaNGOS's package-linux-release.sh, Windows libmySQL/libeay32 from dep/), mod/ (jar), sql/
+   (migrations + custom), VERSIONS.txt. Manual dispatch = run artifacts only; tag v* = DRAFT release. First run green
+   (run 37247644032, 51 min - the Windows client's fat LTO is the long pole); Linux mangosd runs, client needs only
+   ALSA/udev/libc; Windows mangosd.exe runs under Wine. Pushing workflow files needs gh's `workflow` scope (granted).
+   realmd.conf.dist was missing from the Windows zip (installed from source, never built) - fixed, not yet re-run.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.

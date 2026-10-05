@@ -172,6 +172,8 @@ jobs:
           cp dep/windows/lib/x64_release/libmySQL.dll dep/windows/lib/x64_release/libeay32.dll ../out/server/bin/
           # The .conf.dist defaults (tools/server-config.sh writes the live confs from them).
           find build bin -name '*.conf.dist' -exec cp {} ../out/server/etc/ \;
+          # realmd's is installed straight from the source (src/realmd/CMakeLists.txt), never built.
+          cp src/realmd/realmd.conf.dist.in ../out/server/etc/realmd.conf.dist
           ls ../out/server/bin ../out/server/etc
           git rev-parse HEAD > ../out/vmangos.sha
       - uses: actions/upload-artifact@v7
