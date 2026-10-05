@@ -123,7 +123,8 @@ public final class McwowBridgeClient implements ClientModInitializer {
         ClientTickEvents.START_CLIENT_TICK.register(McwowDeckRide::startTick); // carried by a transport deck
         ClientTickEvents.END_CLIENT_TICK.register(McwowDeckRide::endTick); // boarded or left one
         McwowGmChat.register(); // "." lines are WoW GM commands
-        McwowDance.register(); // /dance [race] [m|f], /dance stop
+        McwowDance.register(); // /dance [race] [m|f], /dance all, /dance stop
+        McwowAutoWorld.register(); // first title screen: open the last world or make the Void one
         ClientTickEvents.END_CLIENT_TICK.register(McwowInteract::tick); // WoW under the crosshair
         ClientTickEvents.END_CLIENT_TICK.register(McwowGather::tick); // gathering WoW objects (after the focus)
         // Chopped WoW trees (McwowTrees), for the chop hint's regrow time.
