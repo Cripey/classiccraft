@@ -944,8 +944,8 @@ reference until classiccraft catches up.
    `music.rs` writes the mono Ogg itself (kira decode + vorbis_rs, quality 0.5 = ffmpeg's -q:a 5; same durations) -
    ffmpeg is no longer needed (dropped from setup.sh). Verified: Linux build + mod build; whole client type-checks for
    x86_64-pc-windows-gnu (rustup target + mingw-w64 installed in the box; `CARGO_TARGET_DIR=build/wincheck`); the
-   link code both ways Rust<->Java under the host's Wine with a Windows JDK 25 (`build/wincheck/`). OPEN: live run
-   on Linux after the change (user), anything on real Windows.
+   link code both ways Rust<->Java under the host's Wine with a Windows JDK 25 (`build/wincheck/`). Linux live run
+   user-confirmed 2026-10-04 (all links, dances, weapon pack, discs re-encoded, waygate sound). OPEN: real Windows.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
