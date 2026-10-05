@@ -1001,6 +1001,12 @@ reference until classiccraft catches up.
    the saved account every run (repairs older installs). Launcher confs now `GM.CheatGod = 0` (players are GMs but
    mortal); CONFIG_VERSION 2, so existing installs rewrite their confs (the menu reruns setup). The dev path
    (tools/server-config.sh, CheatGod 1) is unchanged.
+   Facing rate limit user-confirmed on Windows (no more AntiFlood kick). **v0.1.0 published 2026-10-05 as a
+   PRE-RELEASE** (user's pick): tag v0.1.0 on classiccraft 44e4533 (benilla 7b94a0e1, VMaNGOS da1ea5ad7), run
+   37338116323 -> draft checked (RELEASE.txt v0.1.0) -> `gh release edit --draft=false --prerelease`.
+   https://github.com/Cripey/classiccraft/releases/tag/v0.1.0. The launcher's Update reads releases/latest, which skips
+   pre-releases, so Update reports none until a full release. Next release: tag vX.Y.Z on main (the workflow builds the
+   forks' current main/development), check the draft, publish.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
