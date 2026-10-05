@@ -979,6 +979,7 @@ reference until classiccraft catches up.
    isolated in build/launchertest (own ports/DB/fake Minecraft dir); confs match server-config.sh's. Not testable
    here: Play (launches the game - user's rule), real Windows (VC++ check, UAC, Defender). Release workflow builds the
    launcher, adds RELEASE.txt (tag or dev-<sha>), mod/gradle.properties, offmesh/config.json for Windows mmaps.
+   First bundle with the launcher: run 37254287946 green (Windows launcher imports only system DLLs). OPEN: real Windows.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
