@@ -1037,8 +1037,8 @@ reference until classiccraft catches up.
    `config/mcwow.json` or `CLASSICCRAFT_AUTO_WORLD=0`. Phase 2 (not started): hide Minecraft's window, linked
    shutdown; later maybe zero-click Minecraft (own Microsoft login or Prism).
 
-33. **Launcher phase 2: one window, closing together** (2026-10-05, user; OPEN: test live - needs the new mod,
-   benilla and launcher). Mod `McwowSession`: Minecraft's window is MINIMIZED (`SDL_MinimizeWindow`; 26.3 uses SDL;
+33. **Launcher phase 2: one window, closing together** (2026-10-05, user; dev path user-confirmed, the launcher's
+   Play still untested - needs a release bundle). Mod `McwowSession`: Minecraft's window is MINIMIZED (`SDL_MinimizeWindow`; 26.3 uses SDL;
    `WindowMixin` already keeps it rendering when iconified) once WoW reads the overlay, its input bridge is on and a
    world is loaded; restored after WoW has been gone 5 s. Linked quit through the overlay header
    (`protocol/mcwow_overlay_protocol.h`): mcFlags bit 2 `MC_QUIT` (set at CLIENT_STOPPING) -> benilla
@@ -1061,6 +1061,7 @@ reference until classiccraft catches up.
    now, `quit` ends), `tools/play.sh` waits while a dev Minecraft is starting (`GradleWrapperMain runClient` /
    `devlaunchinjector.Main` running) or a fresh status says "menu" (`CC_NOWAIT=1` skips). The minimize no longer
    needs WoW's input bridge on (off while Minecraft's window has focus - it never fired when MC opened over WoW).
+   User-confirmed live 2026-10-05 (dev path: play.sh waits, WoW opens over Minecraft, Minecraft minimizes).
    Not tried: hiding (instead of minimizing) the window - may block presenting on Wayland.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
