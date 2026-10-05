@@ -103,7 +103,25 @@ jobs:
         run: |
           mkdir -p out
           cp benilla/target/ship/classiccraft${{ matrix.exe }} benilla/target/ship/cc_weapon${{ matrix.exe }} out/
+          cp benilla/LICENSE-MIT benilla/LICENSE-APACHE out/
           git -C benilla rev-parse HEAD > out/benilla.sha
+      - name: Third-party notices settings
+        if: matrix.os == 'linux'
+        uses: actions/checkout@v6
+        with:
+          path: cc
+          sparse-checkout: tools/licenses
+          persist-credentials: false
+      - uses: taiki-e/install-action@v2
+        if: matrix.os == 'linux'
+        with:
+          tool: cargo-about
+      - name: Third-party notices (Rust crates in the client, Linux and Windows targets)
+        if: matrix.os == 'linux'
+        working-directory: benilla
+        run: |
+          cargo about generate -c ../cc/tools/licenses/about.toml -m crates/classiccraft/Cargo.toml \
+            ../cc/tools/licenses/about.hbs -o ../out/THIRD-PARTY-LICENSES-client.txt
       - uses: actions/upload-artifact@v7
         with:
           name: client-${{ matrix.os }}
@@ -140,6 +158,17 @@ jobs:
           ls ../out/server ../out/server/bin
           ../out/server/bin/mangosd --version
           git rev-parse HEAD > ../out/vmangos.sha
+      - name: Licenses of the bundled shared libraries
+        run: |
+          set -euo pipefail
+          mkdir -p out/server-libs
+          for f in out/server/lib/*; do
+            lib=$(basename "$f")
+            pkg=$(dpkg -S "*/x86_64-linux-gnu/$lib" 2>/dev/null | head -1 | cut -d: -f1)
+            [[ -n $pkg && -f /usr/share/doc/$pkg/copyright ]] || { echo "no copyright file for $lib" >&2; exit 1; }
+            cp "/usr/share/doc/$pkg/copyright" "out/server-libs/$lib ($pkg).txt"
+          done
+          ls out/server-libs
       - uses: actions/upload-artifact@v7
         with:
           name: server-linux
@@ -189,22 +218,32 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
-      - name: SQL the setup applies - VMaNGOS migrations and classiccraft's own rows
-        uses: actions/checkout@v6
-        with:
-          repository: Cripey/VMaNGOS-classiccraft
-          ref: ${{ env.VMANGOS_REF }}
-          path: vmangos
-          sparse-checkout: |
-            sql/migrations
-            sql/custom
-          persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
           path: parts
+      - name: Built commits
+        id: sha
+        run: |
+          [[ $(cat parts/server-linux/vmangos.sha) == $(cat parts/server-windows/vmangos.sha) ]]
+          [[ $(cat parts/client-linux/benilla.sha) == $(cat parts/client-windows/benilla.sha) ]]
+          {
+            echo "vmangos=$(cat parts/server-linux/vmangos.sha)"
+            echo "benilla=$(cat parts/client-linux/benilla.sha)"
+            echo "classiccraft=$(cat parts/mod/classiccraft.sha)"
+          } >> "$GITHUB_OUTPUT"
+      - name: VMaNGOS at the built commit - SQL the setup applies, licenses, source archive
+        uses: actions/checkout@v6
+        with:
+          repository: Cripey/VMaNGOS-classiccraft
+          ref: ${{ steps.sha.outputs.vmangos }}
+          path: vmangos
+          persist-credentials: false
       - name: Assemble
         run: |
           set -euo pipefail
+          V=${{ steps.sha.outputs.vmangos }} B=${{ steps.sha.outputs.benilla }} C=${{ steps.sha.outputs.classiccraft }}
+          src="VMaNGOS-classiccraft-source-${V:0:9}.tar.gz"
+          git -C vmangos archive --format=tar.gz --prefix="VMaNGOS-classiccraft-${V:0:9}/" -o "$PWD/$src" HEAD
           for os in linux windows; do
             d="stage/classiccraft-$os-x64"
             mkdir -p "$d/client" "$d/mod" "$d/sql"
@@ -213,6 +252,27 @@ jobs:
             cp parts/mod/*.jar "$d/mod/"
             cp -r vmangos/sql/migrations vmangos/sql/custom "$d/sql/"
             cp README.md "$d/"
+            # Licenses: ours, the forks' upstream ones, every third party inside the binaries.
+            l="$d/licenses"
+            mkdir -p "$l/server"
+            cp LICENSE "$l/classiccraft-LICENSE.txt"
+            cp parts/client-$os/LICENSE-MIT "$l/benilla-LICENSE-MIT.txt"
+            cp parts/client-$os/LICENSE-APACHE "$l/benilla-LICENSE-APACHE.txt"
+            cp parts/client-linux/THIRD-PARTY-LICENSES-client.txt "$l/"
+            cp vmangos/LICENSE "$l/VMaNGOS-LICENSE-GPL-2.0.txt"
+            cp vmangos/dep/recastnavigation/License.txt "$l/server/recastnavigation.txt"
+            cp vmangos/dep/libmpq/COPYING "$l/server/libmpq.txt"
+            cp vmangos/dep/cpptrace/LICENSE "$l/server/cpptrace.txt"
+            cp vmangos/dep/include/utf8cpp/LICENSE "$l/server/utf8cpp.txt"
+            cp vmangos/dep/g3dlite/source/license.cpp "$l/server/g3dlite.txt"
+            if [[ $os == linux ]]; then
+              cp parts/server-linux/server-libs/* "$l/server/"
+            else
+              cp tools/licenses/OpenSSL-1.0.2-LICENSE.txt "$l/server/libeay32.dll (OpenSSL 1.0).txt"
+              cp tools/licenses/MySQL-client-NOTICE.txt "$l/server/libmySQL.dll (MySQL client).txt"
+            fi
+            sed -e "s/@VMANGOS@/$V/g; s/@BENILLA@/$B/g; s/@CLASSICCRAFT@/$C/g; s/@SOURCE@/$src/g" \
+              tools/licenses/NOTICE.txt.in > "$d/NOTICE.txt"
             {
               echo "classiccraft $(cat parts/mod/classiccraft.sha)"
               echo "benilla-classiccraft $(cat parts/client-$os/benilla.sha)"
@@ -222,17 +282,20 @@ jobs:
           chmod +x stage/classiccraft-linux-x64/client/* stage/classiccraft-linux-x64/server/bin/*
           (cd stage && tar -czf ../classiccraft-linux-x64.tar.gz classiccraft-linux-x64 \
             && zip -qr ../classiccraft-windows-x64.zip classiccraft-windows-x64)
-          ls -la classiccraft-*-x64.*
+          ls -la classiccraft-*-x64.* VMaNGOS-classiccraft-source-*.tar.gz
           cat stage/classiccraft-linux-x64/VERSIONS.txt
+          cp stage/classiccraft-linux-x64/NOTICE.txt release-notes.md
       - uses: actions/upload-artifact@v7
         with:
           name: classiccraft-release
-          path: classiccraft-*-x64.*
+          path: |
+            classiccraft-*-x64.*
+            VMaNGOS-classiccraft-source-*.tar.gz
       - name: Draft release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" classiccraft-linux-x64.tar.gz classiccraft-windows-x64.zip \
-            --draft --title "classiccraft $GITHUB_REF_NAME" \
-            --notes "Built from: $(tr '\n' ';' < stage/classiccraft-linux-x64/VERSIONS.txt)"
+            VMaNGOS-classiccraft-source-*.tar.gz \
+            --draft --title "classiccraft $GITHUB_REF_NAME" --notes-file release-notes.md

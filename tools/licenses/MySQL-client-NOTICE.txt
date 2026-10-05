@@ -1,0 +1,6 @@
+libmySQL.dll - MySQL client library 5.5.62 (Oracle), as shipped in VMaNGOS's dep/windows/lib.
+
+Licensed under the GNU General Public License version 2 (see ../VMaNGOS-LICENSE-GPL-2.0.txt),
+with Oracle's FOSS License Exception for MySQL client libraries. Source code for MySQL 5.5.62:
+https://downloads.mysql.com/archives/community/ (product "MySQL Community Server", version 5.5.62,
+"Source Code") and https://github.com/mysql/mysql-server/tree/mysql-5.5.62

@@ -1,0 +1,21 @@
+# classiccraft - licenses and source code
+
+classiccraft bundles three programs built from three public repositories. Each keeps its own license.
+No Blizzard or Mojang files are included: the game data is read from your own installations.
+
+| Part | Files | License | Source (the exact commit built) |
+|---|---|---|---|
+| classiccraft (Minecraft mod, tools) | `mod/` | MIT | https://github.com/Cripey/classiccraft/tree/@CLASSICCRAFT@ |
+| benilla-classiccraft (WoW client, a modified fork of [benilla](https://github.com/samwhosung/benilla)) | `client/` | MIT OR Apache-2.0 | https://github.com/Cripey/benilla-classiccraft/tree/@BENILLA@ |
+| VMaNGOS-classiccraft (server, a modified fork of [VMaNGOS](https://github.com/vmangos/core)) | `server/`, `sql/` | GPL-2.0 | https://github.com/Cripey/VMaNGOS-classiccraft/tree/@VMANGOS@ |
+
+**Source code of the server (GPL-2.0):** the complete corresponding source of the VMaNGOS-classiccraft
+binaries is published next to these downloads as `@SOURCE@`, and at the commit linked above.
+
+**Third-party software** inside the binaries, with full license texts, is listed in `licenses/`:
+`THIRD-PARTY-LICENSES-client.txt` (the Rust crates in the client) and `licenses/server/` (libraries in the
+server: Recast/Detour, libmpq, cpptrace, utf8cpp, G3D, and the bundled MySQL client, OpenSSL, zlib, zstd
+and C++ runtime libraries).
+
+This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit
+(http://www.openssl.org/), and cryptographic software written by Eric Young (eay@cryptsoft.com).

@@ -954,6 +954,13 @@ reference until classiccraft catches up.
    (run 37247644032, 51 min - the Windows client's fat LTO is the long pole); Linux mangosd runs, client needs only
    ALSA/udev/libc; Windows mangosd.exe runs under Wine. Pushing workflow files needs gh's `workflow` scope (granted).
    realmd.conf.dist was missing from the Windows zip (installed from source, never built) - fixed, not yet re-run.
+   Licenses (2026-10-05, user picked MIT for this repo): `LICENSE` (MIT, Cripey). Each bundle carries `NOTICE.txt`
+   (parts, licenses, exact source commits; also the draft release's notes) and `licenses/`: ours, benilla MIT+Apache,
+   VMaNGOS GPL-2, `THIRD-PARTY-LICENSES-client.txt` (cargo-about, `tools/licenses/about.toml` + `about.hbs`; ~556
+   crates, all permissive/MPL), `server/` (VMaNGOS dep/ licenses; Linux: the bundled .so files' Debian copyright files;
+   Windows: OpenSSL 1.0.2k + MySQL 5.5.62 client notices from `tools/licenses/`). GPL-2 source: every run archives the
+   built VMaNGOS commit as `VMaNGOS-classiccraft-source-<sha>.tar.gz` (attached to the release). Both forks' READMEs
+   open with a "modified fork" note.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
