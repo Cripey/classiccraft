@@ -980,6 +980,11 @@ reference until classiccraft catches up.
    here: Play (launches the game - user's rule), real Windows (VC++ check, UAC, Defender). Release workflow builds the
    launcher, adds RELEASE.txt (tag or dev-<sha>), mod/gradle.properties, offmesh/config.json for Windows mmaps.
    First bundle with the launcher: run 37254287946 green (Windows launcher imports only system DLLs). OPEN: real Windows.
+   First real Windows try (user, 2026-10-05): setup hung at VMapAssembler - without `--silent` VMaNGOS's extractors
+   wait for Enter (on Linux/Wine the test stdin was /dev/null, so it never showed); the rerun then failed "output
+   directory polluted" (VMapExtractor refuses a non-empty Buildings/). extract.rs now: extractors get no stdin,
+   VMapAssembler `--silent`, each step marked (`extract-maps|buildings|vmaps|mmaps`) and its outputs cleared before a
+   (re)run, "still working... N min" every minute.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
