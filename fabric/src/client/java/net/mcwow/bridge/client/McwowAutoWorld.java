@@ -1,15 +1,9 @@
 package net.mcwow.bridge.client;
 
-import java.io.Reader;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -55,14 +49,7 @@ public final class McwowAutoWorld {
     }
 
     private static boolean enabled() {
-        if ("0".equals(System.getenv("CLASSICCRAFT_AUTO_WORLD"))) return false;
-        Path p = FabricLoader.getInstance().getConfigDir().resolve("mcwow.json");
-        try (Reader r = Files.newBufferedReader(p)) {
-            JsonObject o = JsonParser.parseReader(r).getAsJsonObject();
-            return !o.has("autoWorld") || o.get("autoWorld").getAsBoolean();
-        } catch (Exception e) {
-            return true;
-        }
+        return McwowClientConfig.flag("autoWorld", "CLASSICCRAFT_AUTO_WORLD");
     }
 
     private static void open(Minecraft mc, Screen title) {

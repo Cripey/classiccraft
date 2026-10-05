@@ -125,6 +125,7 @@ public final class McwowBridgeClient implements ClientModInitializer {
         McwowGmChat.register(); // "." lines are WoW GM commands
         McwowDance.register(); // /dance [race] [m|f], /dance all, /dance stop
         McwowAutoWorld.register(); // first title screen: open the last world or make the Void one
+        McwowSession.register(); // minimized while WoW shows Minecraft; WoW and Minecraft close together
         ClientTickEvents.END_CLIENT_TICK.register(McwowInteract::tick); // WoW under the crosshair
         ClientTickEvents.END_CLIENT_TICK.register(McwowGather::tick); // gathering WoW objects (after the focus)
         // Chopped WoW trees (McwowTrees), for the chop hint's regrow time.

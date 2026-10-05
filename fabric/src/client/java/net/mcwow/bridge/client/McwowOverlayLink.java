@@ -32,6 +32,12 @@ public final class McwowOverlayLink {
     private static final long TOTAL = OFF_INPUT + IR_DATA + INPUT_ENTRIES * 16L;
     private static final int DIRTY = 1 << 2;
     public static final int MC_CROSSHAIR = 1, MC_SCREEN = 1 << 1;
+    /** Minecraft is closing (2026-10-05): WoW closes with it (benilla overlay.rs linked_quit). */
+    public static final int MC_QUIT = 1 << 2;
+    /** WoW's word at OFF_WOW_STATE: 1 running, 2 closing. */
+    public static final int WOW_RUNNING = 1, WOW_QUIT = 2;
+    private static final long OFF_WOW_STATE = 60;
+    private static volatile boolean quitting;
 
     private static final long OFF_MAGIC = 0, OFF_VERSION = 4, OFF_WRITER_PID = 8, OFF_STATE = 12,
             OFF_FRAMES_PUBLISHED = 16, OFF_WRITER_HEARTBEAT = 24, OFF_GUI_SCALE = 32,
@@ -59,6 +65,7 @@ public final class McwowOverlayLink {
                 s.set(ValueLayout.JAVA_INT, OFF_WRITER_PID, (int) ProcessHandle.current().pid());
                 back = 0;
                 INT.setVolatile(s, OFF_STATE, 1); // middle = 1, clean; reader starts on 2
+                INT.setVolatile(s, OFF_WOW_STATE, 0); // a WoW that closed last run says nothing now
                 // Skip anything WoW queued before we attached (stale input from a previous run).
                 s.set(ValueLayout.JAVA_LONG, OFF_INPUT + IR_TAIL, (long) LONG.getVolatile(s, OFF_INPUT + IR_HEAD));
                 shm = s;
@@ -85,6 +92,21 @@ public final class McwowOverlayLink {
             readerSeenNanos = now;
         }
         return readerSeenNanos != 0 && now - readerSeenNanos < 1_000_000_000L;
+    }
+
+    /** Minecraft is closing: flag it now (the frame loop may not run again) and in every later frame. */
+    public static void markQuitting() {
+        quitting = true;
+        MemorySegment s = segment();
+        if (s != null) {
+            INT.setVolatile(s, OFF_MC_FLAGS, (int) INT.getVolatile(s, OFF_MC_FLAGS) | MC_QUIT);
+        }
+    }
+
+    /** WoW's state word: 0 unknown, WOW_RUNNING, WOW_QUIT. */
+    public static int wowState() {
+        MemorySegment s = segment();
+        return s == null ? 0 : (int) INT.getVolatile(s, OFF_WOW_STATE);
     }
 
     /** True while WoW forwards its keyboard/mouse to Minecraft (Numpad+ bridge on, WoW alive). */
@@ -125,6 +147,7 @@ public final class McwowOverlayLink {
         int flags = 0;
         if (mc.gui.screen() != null) flags |= MC_SCREEN;
         else if (mc.player != null && mc.options.getCameraType().isFirstPerson()) flags |= MC_CROSSHAIR;
+        if (quitting) flags |= MC_QUIT;
         s.set(ValueLayout.JAVA_INT, OFF_GUI_SCALE, mc.getWindow().getGuiScale());
         s.set(ValueLayout.JAVA_INT, OFF_MC_FLAGS, flags);
         // Live FOV incl. bow zoom / sprint; mcwow.dll eases WoW toward it (perf fovrate) because
