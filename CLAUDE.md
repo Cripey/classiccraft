@@ -1008,6 +1008,18 @@ reference until classiccraft catches up.
    pre-releases, so Update reports none until a full release. Next release: tag vX.Y.Z on main (the workflow builds the
    forks' current main/development), check the draft, publish.
 
+31. **Neutral Minecraft race** (2026-10-05, user: one race, "neutral forever"; design `docs/topics.md` rows 40-41;
+   OPEN: test live - needs the new mangosd (installed + started) and benilla). VMaNGOS `ClassicCraftNeutral.cpp`,
+   config `ClassicCraft.NeutralRace` (default 1): every character gets faction template 990
+   (`sql/custom/classiccraft_neutral.sql`: player group, friendly Alliance+Horde, hostile monsters), team ALLIANCE
+   (`TeamForRace`), race mask = all playable races (`Unit::GetRaceMask`, out of line now: both factions' quests),
+   base reputation = each faction's best class-fitting slot, never at war (`NeutralRepIndex`, ReputationMgr), no
+   racial skills/spells (8 racial skill lines; `LearnDefaultSpells` skips them, login strips old ones), all 8 player
+   languages, no PvP-enforced Alliance/Horde zones. Log `[classiccraft] <name>: neutral race (...)`. benilla:
+   `benilla_formats::NEUTRAL_FACTION_TEMPLATE` added to the catalog, `reputation_race` -> `NEUTRAL_RACE` (best slot)
+   at the rank call sites (ring, reputation pane, unit tooltip, item feed). The stored race still picks model and
+   dances. Not done: quests that kill the other faction's NPCs, per-faction twin quests, UnitFactionGroup in the UI.
+
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
   From now on (user, 2026-10-04): commit each logical change as it's done, small commits in whichever repo it touches,

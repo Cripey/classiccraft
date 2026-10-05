@@ -3,7 +3,7 @@
 #  - creates the databases and the server's DB user if missing
 #  - imports VMaNGOS's world dump (release db_latest, downloaded to data/db) into empty databases
 #  - applies vmangos/sql/migrations (each one records itself and runs once)
-#  - applies classiccraft's own rows (sql/custom/classiccraft_proxies.sql) and the realm entry
+#  - applies classiccraft's own rows (sql/custom/classiccraft_*.sql) and the realm entry
 set -euo pipefail
 . "$(dirname "$0")/config.sh"
 cd "$CC_ROOT"
@@ -69,7 +69,7 @@ for d in "${dbs[@]}"; do
 done
 
 # --- classiccraft ----------------------------------------------------------------------------
-sql mangos < vmangos/sql/custom/classiccraft_proxies.sql
+for f in vmangos/sql/custom/classiccraft_*.sql; do sql mangos < "$f"; done
 sql realmd <<EOF
 INSERT INTO realmlist (id, name, address, localAddress, port, icon, realmflags, timezone,
     allowedSecurityLevel, population, gamebuild_min, gamebuild_max, realmbuilds)
