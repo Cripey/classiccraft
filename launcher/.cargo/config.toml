@@ -1,0 +1,4 @@
+# The launcher runs before setup has installed the Visual C++ runtimes (winrt.rs): link the C
+# runtime statically on Windows.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

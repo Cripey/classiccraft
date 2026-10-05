@@ -1,0 +1,21 @@
+[package]
+name = "classiccraft-launcher"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "classiccraft's setup, play and update program for the release bundles (Linux and Windows)"
+publish = false
+
+[dependencies]
+anyhow = "1"
+flate2 = "1"
+rpassword = "7"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+tar = "0.4"
+ureq = { version = "3", features = ["json"] }
+zip = { version = "8", default-features = false, features = ["deflate"] }
+
+[profile.release]
+strip = true
