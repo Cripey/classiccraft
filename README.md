@@ -15,12 +15,13 @@ It is three projects working together:
 
 Everything runs on your own PC, offline, just for you.
 
-> **Work in progress.** Expect rough edges. Linux only for now (Windows is planned).
+> **Work in progress.** Expect rough edges. Linux and Windows (Windows is new and not yet tested on
+> many PCs - reports welcome).
 
 ## What you need
 
-- **Linux** - Ubuntu/Debian (Ubuntu 26.04 tested) or Arch. Other distributions work if you install
-  the packages yourself.
+- **Windows 10/11 (64-bit)** or **Linux** (Ubuntu/Debian, Arch; others work if you install the
+  packages yourself).
 - **A graphics card with Vulkan** (NVIDIA, AMD or Intel with current drivers).
 - **Your own World of Warcraft 1.12.1 (build 5875) client.** classiccraft never ships Blizzard's
   files; it reads them from your client folder and never changes it.
@@ -28,7 +29,24 @@ Everything runs on your own PC, offline, just for you.
 - About **15 GB** of free disk space and 30-60 minutes for the first setup (mostly compiling and
   extracting map data).
 
-## Install
+## Install from a release (Windows and Linux)
+
+1. Download `classiccraft-windows-x64.zip` or `classiccraft-linux-x64.tar.gz` from
+   [Releases](https://github.com/Cripey/classiccraft/releases) and unpack it where it can stay (it
+   grows to ~15 GB; your world and settings live in its `data/` folder).
+2. Start `classiccraft-launcher` (Windows: double-click `classiccraft-launcher.exe`; Windows may warn
+   about an unknown publisher - "More info" > "Run anyway"). Linux needs the MariaDB server
+   installed first: `sudo apt install mariadb-server-core mariadb-client-core` or `sudo pacman -S mariadb`.
+3. The first start sets everything up: it asks for your WoW folder and an account name and
+   password, then (Windows only) installs Microsoft's Visual C++ runtimes if missing, downloads a
+   private MariaDB and the server database, extracts the server's map data from your WoW client
+   (15-30 minutes), creates your account and adds the **classiccraft** profile to the Minecraft
+   launcher. If something fails, start the launcher again; it carries on where it stopped.
+4. Then pick **Play** in the launcher: it starts the server and WoW. Start Minecraft from its
+   launcher with the **classiccraft** profile (see Play below). **Update** in the launcher gets
+   the newest release.
+
+## Install from source (Linux, for development)
 
 ```bash
 git clone https://github.com/Cripey/classiccraft.git
@@ -51,6 +69,9 @@ If something fails, fix the cause and run `tools/setup.sh` again; it continues w
 
 ## Play
 
+With a release, the launcher's **Play** does steps 1, 3 and 4 (type `quit` in it when you're done).
+From source:
+
 1. Start the server: `tools/server.sh start`
 2. In the Minecraft launcher, pick the **classiccraft** profile and press Play. Create a world:
    *Create New World > World Type: Superflat > Customize > Presets > The Void*, and load it.
@@ -67,6 +88,8 @@ If something fails, fix the cause and run `tools/setup.sh` again; it continues w
 - **Numpad +** puts Steve back onto your WoW character if they ever drift apart.
 
 ## Update
+
+With a release: **Update** in the launcher. From source:
 
 ```bash
 tools/update.sh
@@ -103,6 +126,12 @@ If you change a port after setup, run `tools/server-config.sh` and `tools/minecr
 Design notes and the full history are in [CLAUDE.md](CLAUDE.md). `tools/build.sh [server|client|mod]`
 builds one piece; `tools/minecraft.sh` runs Minecraft as a Fabric development client instead of
 the launcher.
+
+## License
+
+classiccraft's own code is MIT (`LICENSE`). The client fork is MIT or Apache-2.0 like benilla, the
+server fork is GPL-2.0 like VMaNGOS; each release's `NOTICE.txt` and `licenses/` list every part and
+third-party library, and the server's source is attached to each release.
 
 ## Credits
 

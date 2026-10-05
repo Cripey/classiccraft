@@ -961,6 +961,24 @@ reference until classiccraft catches up.
    Windows: OpenSSL 1.0.2k + MySQL 5.5.62 client notices from `tools/licenses/`). GPL-2 source: every run archives the
    built VMaNGOS commit as `VMaNGOS-classiccraft-source-<sha>.tar.gz` (attached to the release). Both forks' READMEs
    open with a "modified fork" note.
+30. **Windows port, step 3: the launcher** (2026-10-05; user's picks: terminal program, bash scripts stay the dev path,
+   portable MariaDB on Windows). `launcher/` (own Cargo crate, toolchain pinned like benilla; `.cargo/config.toml`
+   links the CRT statically on Windows) -> `classiccraft-launcher(.exe)` at the bundle root. Menu: Play / Update /
+   Setup again / Quit; subcommands `setup|play|update|minecraft|weapons`. Everything it makes lives in the bundle's
+   `data/` (`settings.json` = WoW folder, account, ports 3307/3725/8086, Windows DB root password, Minecraft dir;
+   `setup/` step marks; `etc/` live confs; `run/` logs; `server/` extracted data; `mariadb/`). Ports of the scripts:
+   db.rs (Linux: system MariaDB programs + socket; Windows: MariaDB 11.8.9 zip pinned by sha256, root password over
+   TCP; mariadbd detached), dbsetup.rs, extract.rs, server.rs (configs = server-config.sh's; the launcher holds
+   mangosd's stdin, so a Play session = server alive, typed lines = console commands, `quit` stops all),
+   minecraft.rs (no Java needed: Fabric's meta profile JSON + empty jar, profile in launcher_profiles.json and the
+   Microsoft Store one, Fabric API from Modrinth, mcwow.json), weapons.rs (cc_weapon), update.rs (GitHub
+   releases/latest, swaps client/server/mod/sql/licenses, renames its own running exe), winrt.rs (Windows: VC++
+   2015-2022 + 2008 - libmySQL.dll needs MSVCR90 - via Microsoft's installers, UAC through PowerShell RunAs).
+   Unattended account: CLASSICCRAFT_ACCOUNT/CLASSICCRAFT_PASSWORD. Tested 2026-10-05: full setup on the Linux bundle
+   AND the Windows bundle under Wine (MariaDB download/init, import, mangosd.exe account, Fabric profile, cc_weapon.exe),
+   isolated in build/launchertest (own ports/DB/fake Minecraft dir); confs match server-config.sh's. Not testable
+   here: Play (launches the game - user's rule), real Windows (VC++ check, UAC, Defender). Release workflow builds the
+   launcher, adds RELEASE.txt (tag or dev-<sha>), mod/gradle.properties, offmesh/config.json for Windows mmaps.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.

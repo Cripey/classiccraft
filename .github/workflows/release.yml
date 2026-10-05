@@ -90,9 +90,19 @@ jobs:
         working-directory: benilla
         shell: bash
         run: rustup toolchain install && rustc -V
+      - name: Launcher source
+        uses: actions/checkout@v6
+        with:
+          path: cc
+          sparse-checkout: |
+            launcher
+            tools/licenses
+          persist-credentials: false
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: benilla
+          workspaces: |
+            benilla
+            cc/launcher
           key: ship
       - name: Build (ship profile)
         working-directory: benilla
@@ -105,13 +115,12 @@ jobs:
           cp benilla/target/ship/classiccraft${{ matrix.exe }} benilla/target/ship/cc_weapon${{ matrix.exe }} out/
           cp benilla/LICENSE-MIT benilla/LICENSE-APACHE out/
           git -C benilla rev-parse HEAD > out/benilla.sha
-      - name: Third-party notices settings
-        if: matrix.os == 'linux'
-        uses: actions/checkout@v6
-        with:
-          path: cc
-          sparse-checkout: tools/licenses
-          persist-credentials: false
+      - name: Build the launcher
+        working-directory: cc/launcher
+        shell: bash
+        run: |
+          cargo build --release
+          cp target/release/classiccraft-launcher${{ matrix.exe }} ../../out/
       - uses: taiki-e/install-action@v2
         if: matrix.os == 'linux'
         with:
@@ -122,6 +131,8 @@ jobs:
         run: |
           cargo about generate -c ../cc/tools/licenses/about.toml -m crates/classiccraft/Cargo.toml \
             ../cc/tools/licenses/about.hbs -o ../out/THIRD-PARTY-LICENSES-client.txt
+          cargo about generate -c ../cc/tools/licenses/about.toml -m ../cc/launcher/Cargo.toml \
+            ../cc/tools/licenses/about.hbs -o ../out/THIRD-PARTY-LICENSES-launcher.txt
       - uses: actions/upload-artifact@v7
         with:
           name: client-${{ matrix.os }}
@@ -203,6 +214,8 @@ jobs:
           find build bin -name '*.conf.dist' -exec cp {} ../out/server/etc/ \;
           # realmd's is installed straight from the source (src/realmd/CMakeLists.txt), never built.
           cp src/realmd/realmd.conf.dist.in ../out/server/etc/realmd.conf.dist
+          # MoveMapGenerator's inputs (installed next to the extractors on Linux).
+          cp contrib/mmap/offmesh.txt contrib/mmap/config.json ../out/server/bin/
           ls ../out/server/bin ../out/server/etc
           git rev-parse HEAD > ../out/vmangos.sha
       - uses: actions/upload-artifact@v7
@@ -243,13 +256,19 @@ jobs:
           set -euo pipefail
           V=${{ steps.sha.outputs.vmangos }} B=${{ steps.sha.outputs.benilla }} C=${{ steps.sha.outputs.classiccraft }}
           src="VMaNGOS-classiccraft-source-${V:0:9}.tar.gz"
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then release=$GITHUB_REF_NAME; else release="dev-${C:0:9}"; fi
           git -C vmangos archive --format=tar.gz --prefix="VMaNGOS-classiccraft-${V:0:9}/" -o "$PWD/$src" HEAD
           for os in linux windows; do
             d="stage/classiccraft-$os-x64"
             mkdir -p "$d/client" "$d/mod" "$d/sql"
             cp -r "parts/server-$os/server" "$d/server"
             cp parts/client-$os/classiccraft* parts/client-$os/cc_weapon* "$d/client/"
+            rm "$d"/client/classiccraft-launcher*
             cp parts/mod/*.jar "$d/mod/"
+            # The launcher installs Fabric and Fabric API at the versions the mod was built for.
+            cp fabric/gradle.properties "$d/mod/"
+            cp parts/client-$os/classiccraft-launcher* "$d/"
+            echo "$release" > "$d/RELEASE.txt"
             cp -r vmangos/sql/migrations vmangos/sql/custom "$d/sql/"
             cp README.md "$d/"
             # Licenses: ours, the forks' upstream ones, every third party inside the binaries.
@@ -258,7 +277,7 @@ jobs:
             cp LICENSE "$l/classiccraft-LICENSE.txt"
             cp parts/client-$os/LICENSE-MIT "$l/benilla-LICENSE-MIT.txt"
             cp parts/client-$os/LICENSE-APACHE "$l/benilla-LICENSE-APACHE.txt"
-            cp parts/client-linux/THIRD-PARTY-LICENSES-client.txt "$l/"
+            cp parts/client-linux/THIRD-PARTY-LICENSES-client.txt parts/client-linux/THIRD-PARTY-LICENSES-launcher.txt "$l/"
             cp vmangos/LICENSE "$l/VMaNGOS-LICENSE-GPL-2.0.txt"
             cp vmangos/dep/recastnavigation/License.txt "$l/server/recastnavigation.txt"
             cp vmangos/dep/libmpq/COPYING "$l/server/libmpq.txt"
@@ -279,7 +298,8 @@ jobs:
               echo "VMaNGOS-classiccraft $(cat parts/server-$os/vmangos.sha)"
             } > "$d/VERSIONS.txt"
           done
-          chmod +x stage/classiccraft-linux-x64/client/* stage/classiccraft-linux-x64/server/bin/*
+          chmod +x stage/classiccraft-linux-x64/classiccraft-launcher stage/classiccraft-linux-x64/client/* \
+            stage/classiccraft-linux-x64/server/bin/* stage/classiccraft-linux-x64/server/bin/Extractors/*
           (cd stage && tar -czf ../classiccraft-linux-x64.tar.gz classiccraft-linux-x64 \
             && zip -qr ../classiccraft-windows-x64.zip classiccraft-windows-x64)
           ls -la classiccraft-*-x64.* VMaNGOS-classiccraft-source-*.tar.gz
