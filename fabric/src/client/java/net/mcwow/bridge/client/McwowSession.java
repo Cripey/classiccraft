@@ -30,6 +30,8 @@ public final class McwowSession {
 
     private static boolean minimizeOn, linkedQuitOn;
     private static boolean minimized;
+    /** Ticks until the minimize is checked (the window manager answers later), and tries left. */
+    private static int checkIn, triesLeft;
     private static long wowLastSeen;
     private static boolean wowSeenRunning;
     private static boolean closing;
@@ -53,6 +55,16 @@ public final class McwowSession {
         });
     }
 
+    private static void minimize(Minecraft mc, String why) {
+        triesLeft--;
+        checkIn = 20;
+        long window = mc.getWindow().handle();
+        boolean ok = SDLVideo.SDL_MinimizeWindow(window);
+        SDLVideo.SDL_SyncWindow(window);
+        LOGGER.info("mcwow-bridge: {} - minimizing Minecraft's window ({})", why,
+                ok ? "requested" : "SDL: " + org.lwjgl.sdl.SDLError.SDL_GetError());
+    }
+
     private static void tick(Minecraft mc) {
         long now = System.nanoTime();
         boolean linked = McwowOverlayLink.linked();
@@ -62,8 +74,18 @@ public final class McwowSession {
             boolean shown = linked && McwowOverlayLink.inputActive() && mc.level != null && mc.player != null;
             if (shown && !minimized) {
                 minimized = true;
-                SDLVideo.SDL_MinimizeWindow(mc.getWindow().handle());
-                LOGGER.info("mcwow-bridge: WoW shows Minecraft - Minecraft's window minimized");
+                triesLeft = 3;
+                minimize(mc, "WoW shows Minecraft");
+            } else if (minimized && checkIn > 0 && --checkIn == 0) {
+                long flags = SDLVideo.SDL_GetWindowFlags(mc.getWindow().handle());
+                if ((flags & SDLVideo.SDL_WINDOW_MINIMIZED) != 0) {
+                    LOGGER.info("mcwow-bridge: Minecraft's window is minimized");
+                } else if (triesLeft > 0) {
+                    minimize(mc, "still not minimized (window flags 0x" + Long.toHexString(flags) + ")");
+                } else {
+                    LOGGER.warn("mcwow-bridge: the window manager didn't minimize Minecraft's window (flags 0x{})",
+                            Long.toHexString(flags));
+                }
             } else if (minimized && !linked && now - wowLastSeen > RESTORE_AFTER_NANOS) {
                 minimized = false;
                 SDLVideo.SDL_RestoreWindow(mc.getWindow().handle());
