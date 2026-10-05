@@ -302,7 +302,12 @@ fn session(
             }
         };
         if quit {
-            let _ = wow.kill();
+            close_client(inst, &mut wow);
+            return Ok(());
+        }
+        // Closed normally (its Exit, or Minecraft closed and took WoW along): the session is over.
+        if wow.try_wait()?.is_some_and(|st| st.success()) {
+            ui::ok("WoW closed");
             return Ok(());
         }
         ui::say("WoW closed. Press Enter to start it again, or type \"quit\" to stop the server.");
@@ -315,6 +320,26 @@ fn session(
             }
         }
     }
+}
+
+/// The file WoW watches for the launcher's "quit" (benilla's CLASSICCRAFT_QUIT_FILE).
+fn quit_file(inst: &Install) -> std::path::PathBuf {
+    inst.run_dir().join("quit-wow")
+}
+
+/// Ask WoW to close as by its own Exit (Minecraft then saves and closes too); after 10 s, end it.
+fn close_client(inst: &Install, wow: &mut Child) {
+    if std::fs::write(quit_file(inst), b"").is_ok() {
+        ui::say("Closing WoW and Minecraft...");
+        let t0 = Instant::now();
+        while t0.elapsed() < Duration::from_secs(10) {
+            if matches!(wow.try_wait(), Ok(Some(_))) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+    }
+    let _ = wow.kill();
 }
 
 /// Who WoW logs in as: the saved account and password, and the character played last.
@@ -378,6 +403,8 @@ fn start_client(
     let log = std::fs::File::create(inst.run_dir().join("classiccraft.log"))?;
     let exe = inst.client_exe();
     let mut cmd = Command::new(&exe);
+    let _ = std::fs::remove_file(quit_file(inst));
+    cmd.env("CLASSICCRAFT_QUIT_FILE", quit_file(inst));
     // Auto-login (benilla: both WOW_USER and WOW_PASS), straight into the world as WOW_CHAR.
     if let (Some(user), Some(pass)) = (&login.account, &login.password) {
         cmd.env("WOW_USER", user).env("WOW_PASS", pass);
