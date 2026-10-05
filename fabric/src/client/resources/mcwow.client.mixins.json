@@ -18,6 +18,7 @@
     "HandSunMixin",
     "LevelRendererMixin",
     "MinecraftMixin",
+    "QuitButtonLabelMixin",
     "InputConstantsMixin",
     "WindowMixin",
     "ScreenMixin",

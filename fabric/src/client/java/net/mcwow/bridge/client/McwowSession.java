@@ -17,6 +17,9 @@ import org.slf4j.LoggerFactory;
  *  - Closing together: WoW closing (its state word goes to 2 after it was seen at 1) saves and
  *    leaves the world, then closes Minecraft; Minecraft closing sets MC_QUIT, and WoW closes
  *    (benilla overlay.rs linked_quit).
+ *  - Leaving the world while WoW shows Minecraft closes the game (user, 2026-10-05): the title
+ *    screen can't be reached from WoW's window, and plain WoW behind it was a dead end. The pause
+ *    menu's button says so (QuitButtonLabelMixin).
  * Off with "minimizeWindow": false / "linkedQuit": false in config/mcwow.json, or
  * CLASSICCRAFT_MINIMIZE=0 / CLASSICCRAFT_LINKED_QUIT=0.
  */
@@ -30,8 +33,15 @@ public final class McwowSession {
     private static long wowLastSeen;
     private static boolean wowSeenRunning;
     private static boolean closing;
+    /** A world was loaded last tick while WoW showed Minecraft (input bridge on). */
+    private static boolean inLinkedWorld;
 
     private McwowSession() {
+    }
+
+    /** Leaving the world now closes the whole game. */
+    public static boolean leavingQuits() {
+        return linkedQuitOn && McwowOverlayLink.linked();
     }
 
     static void register() {
@@ -62,6 +72,14 @@ public final class McwowSession {
         }
 
         if (!linkedQuitOn) return;
+        if (mc.level != null) {
+            inLinkedWorld = linked;
+        } else if (inLinkedWorld && !closing) {
+            // Save and Quit (the world is saved by now): close the game; WoW follows (MC_QUIT).
+            inLinkedWorld = false;
+            closing = true;
+            LOGGER.info("mcwow-bridge: left the world while WoW showed it - closing the game");
+        }
         int wow = McwowOverlayLink.wowState();
         if (wow == McwowOverlayLink.WOW_RUNNING) wowSeenRunning = true;
         if (closing) {
