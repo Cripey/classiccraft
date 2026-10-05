@@ -13,6 +13,18 @@ final class McwowClientConfig {
     private McwowClientConfig() {
     }
 
+    /** A text setting in mcwow.json, null when absent or empty. */
+    static String text(String key) {
+        Path p = FabricLoader.getInstance().getConfigDir().resolve("mcwow.json");
+        try (Reader r = Files.newBufferedReader(p)) {
+            JsonObject o = JsonParser.parseReader(r).getAsJsonObject();
+            String v = o.has(key) && o.get(key).isJsonPrimitive() ? o.get(key).getAsString().trim() : "";
+            return v.isEmpty() ? null : v;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** `key` in mcwow.json (default on); the environment variable `env` = "0" turns it off. */
     static boolean flag(String key, String env) {
         if ("0".equals(System.getenv(env))) return false;
