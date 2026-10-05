@@ -42,7 +42,8 @@ Everything runs on your own PC, offline, just for you.
    private MariaDB and the server database, extracts the server's map data from your WoW client
    (15-30 minutes), creates your account and adds the **classiccraft** profile to the Minecraft
    launcher. If something fails, start the launcher again; it carries on where it stopped.
-4. Then pick **Play** in the launcher: it starts the server, opens the Minecraft launcher with the
+4. A **save** is a WoW character plus its own Minecraft world: the launcher's menu makes new saves,
+   lists and chooses them, and deletes them. Then pick **Play** in the launcher: it starts the server, opens the Minecraft launcher with the
    **classiccraft** profile selected (press its Play button - your world opens by itself, the first
    time a new one is made) and starts WoW, which logs in by itself as the character you played last.
    Minecraft's window minimizes itself once WoW shows Minecraft, and closing either game closes
@@ -75,11 +76,11 @@ With a release, the launcher's **Play** does all of this (type `quit` in it when
 From source:
 
 1. Start the server: `tools/server.sh start`
-2. In the Minecraft launcher, pick the **classiccraft** profile and press Play. The world you played
-   last opens by itself; with none yet, a Void world named "classiccraft" is made (`"autoWorld": false`
-   in the game folder's `config/mcwow.json` turns this off).
-3. Start WoW: `tools/play.sh` (`WOW_USER`, `WOW_PASS`, `WOW_CHAR` log in by themselves), log in and
-   enter the world. Steve appears where your character is.
+2. A save is a WoW character plus its own Minecraft world. `tools/minecraft.sh <Character>` opens
+   that character's world (made on the Void preset the first time); without a name, the world you
+   played last opens (`"autoWorld": false` in `fabric/run/config/mcwow.json` turns this off).
+3. Start WoW: `tools/play.sh <Character>` (with `WOW_USER`/`WOW_PASS` it logs in by itself;
+   `tools/play.sh --new <Name>` creates a new Blockborn first). Steve appears where your character is.
 4. When you're done: `tools/server.sh stop`
 
 ### Controls

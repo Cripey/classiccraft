@@ -1064,6 +1064,21 @@ reference until classiccraft catches up.
    User-confirmed live 2026-10-05 (dev path: play.sh waits, WoW opens over Minecraft, Minecraft minimizes).
    Not tried: hiding (instead of minimizing) the window - may block presenting on Wayland.
 
+34. **Saves: a WoW character + its own Minecraft world** (2026-10-05, user; OPEN: test live). The race is called
+   **Blockborn** (user; WoW's UI still says Human - a benilla display change, not done). Launcher menu: "Play: <save>",
+   Choose a save (the account's characters, level, last played), New save (name: the Minecraft launcher account's
+   player name from launcher_accounts*.json cleaned to 2-12 letters, editable; checked against the server's names;
+   WoW's reserved names are only refused at creation), Delete a save (typed name; server console `character erase`,
+   then `<game dir>/saves/<name>`). `settings.save`; Play resolves the chosen save, else the last played, else asks
+   for a new one; writes `"world": <name>` into the game folder's config/mcwow.json (`minecraft::set_world`; setup's
+   rewrite keeps other keys) and passes `WOW_CHAR` (+ `WOW_CREATE_CHAR` for a new save). benilla fork
+   (`char_select/mod.rs`, player build): `WOW_CREATE_CHAR=<name>` creates the missing `WOW_CHAR` character once
+   (Human warrior male, look 0; the server makes it neutral) and the fresh roster takes the fast path. Mod
+   `McwowAutoWorld`: with "world" set, exactly that world opens (folder = name), made on the Void preset the first
+   time. Dev: `tools/minecraft.sh <Character>` (writes fabric/run/config/mcwow.json "world"; no name = last world) and
+   `tools/play.sh [--new] <Character>`. First-use link for the user's own data: fabric/run/saves/k2 -> Steve (to do
+   while Minecraft is closed). Co-op saves (friend's server + Minecraft server address) later.
+
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
   From now on (user, 2026-10-04): commit each logical change as it's done, small commits in whichever repo it touches,
