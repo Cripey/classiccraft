@@ -38,7 +38,9 @@
 //                            InputBridge is on) - Minecraft then acts focused and reads the ring
 //   56  f32 mcFovDeg         writer: Minecraft's actual rendered vertical FOV this frame
 //                            (Camera.getFov(), sprint/effects included) - WoW's camera follows it
-//   60..63 reserved
+//   60  u32 wowState         reader (WoW): 1 while running, 2 once closing (2026-10-05) - Minecraft
+//                            then saves, leaves its world and closes. Zeroed by the writer at
+//                            creation; acted on only after 1 was seen.
 //   64  slot headers, MCWOW_OVERLAY_SLOTS x 32 bytes:
 //         +0 u32 width, +4 u32 height, +8 u32 flags (bit0 bottom-up rows), +12 u32 pad,
 //         +16 u64 frameId, +24 u64 pad
@@ -86,6 +88,10 @@
 
 #define MCWOW_OVERLAY_MC_CROSSHAIR (1u << 0) // crosshair (+ attack indicator) visible
 #define MCWOW_OVERLAY_MC_SCREEN (1u << 1)    // a Minecraft screen (inventory, menu...) is open
+#define MCWOW_OVERLAY_MC_QUIT (1u << 2)      // Minecraft is closing: WoW closes too (acted on only
+                                             // after the bit was seen clear)
+#define MCWOW_OVERLAY_WOW_RUNNING 1u         // wowState values
+#define MCWOW_OVERLAY_WOW_QUIT 2u
 
 typedef struct McwowOverlayHeader {
     uint32_t magic;
@@ -101,7 +107,7 @@ typedef struct McwowOverlayHeader {
     uint32_t wowBackBufferH;
     uint32_t inputActive;
     float mcFovDeg;
-    uint32_t reserved[1];
+    uint32_t wowState;
 } McwowOverlayHeader;
 
 typedef struct McwowOverlaySlotHdr {

@@ -45,7 +45,8 @@ Everything runs on your own PC, offline, just for you.
 4. Then pick **Play** in the launcher: it starts the server, opens the Minecraft launcher with the
    **classiccraft** profile selected (press its Play button - your world opens by itself, the first
    time a new one is made) and starts WoW, which logs in by itself as the character you played last.
-   **Update** in the launcher gets the newest release.
+   Minecraft's window minimizes itself once WoW shows Minecraft, and closing either game closes
+   both (and ends the session). **Update** in the launcher gets the newest release.
 
 ## Install from source (Linux, for development)
 

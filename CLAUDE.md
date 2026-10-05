@@ -1037,6 +1037,21 @@ reference until classiccraft catches up.
    `config/mcwow.json` or `CLASSICCRAFT_AUTO_WORLD=0`. Phase 2 (not started): hide Minecraft's window, linked
    shutdown; later maybe zero-click Minecraft (own Microsoft login or Prism).
 
+33. **Launcher phase 2: one window, closing together** (2026-10-05, user; OPEN: test live - needs the new mod,
+   benilla and launcher). Mod `McwowSession`: Minecraft's window is MINIMIZED (`SDL_MinimizeWindow`; 26.3 uses SDL;
+   `WindowMixin` already keeps it rendering when iconified) once WoW reads the overlay, its input bridge is on and a
+   world is loaded; restored after WoW has been gone 5 s. Linked quit through the overlay header
+   (`protocol/mcwow_overlay_protocol.h`): mcFlags bit 2 `MC_QUIT` (set at CLIENT_STOPPING) -> benilla
+   `overlay.rs linked_quit` writes AppExit (as ForceQuit); benilla's `wowState` word at 60 (was reserved): 1 each
+   frame, 2 from `announce_quit` (Last, on any AppExit) -> the mod saves and leaves the world as the pause menu does
+   (`disconnectFromWorld`), then `mc.stop()`. Each side acts only after seeing the other's flag clear / running this
+   session (stale files close nothing); the mod zeroes wowState when it creates the file. Opt-outs:
+   `"minimizeWindow"`, `"linkedQuit"` in config/mcwow.json (`McwowClientConfig`), env `CLASSICCRAFT_MINIMIZE=0`,
+   `CLASSICCRAFT_LINKED_QUIT=0` (both sides; development: restart WoW alone). Launcher: WoW exiting with success ends
+   the Play session (server + DB stop); a crash still offers a restart; typing `quit` creates `data/run/quit-wow`
+   (benilla polls `CLASSICCRAFT_QUIT_FILE` each second -> AppExit -> Minecraft follows), killed after 10 s.
+   Not tried: hiding (instead of minimizing) the window - may block presenting on Wayland.
+
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
   From now on (user, 2026-10-04): commit each logical change as it's done, small commits in whichever repo it touches,
