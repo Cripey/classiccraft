@@ -1008,7 +1008,9 @@ reference until classiccraft catches up.
    Facing rate limit user-confirmed on Windows (no more AntiFlood kick). **v0.1.0 published 2026-10-05 as a
    PRE-RELEASE** (user's pick): tag v0.1.0 on classiccraft 44e4533 (benilla 7b94a0e1, VMaNGOS da1ea5ad7), run
    37338116323 -> draft checked (RELEASE.txt v0.1.0) -> `gh release edit --draft=false --prerelease`.
-   https://github.com/Cripey/classiccraft/releases/tag/v0.1.0. The launcher's Update reads releases/latest, which skips
+   https://github.com/Cripey/classiccraft/releases/tag/v0.1.0. **v0.2.0 published 2026-10-05 as a PRE-RELEASE** (neutral race, saves, launcher
+   phases 1-2, /dance; classiccraft c0eaa19, benilla b07953fe, VMaNGOS f3f6dad93; run 37391030969) for the user's fresh
+   Windows test. The launcher's Update reads releases/latest, which skips
    pre-releases, so Update reports none until a full release. Next release: tag vX.Y.Z on main (the workflow builds the
    forks' current main/development), check the draft, publish.
 
