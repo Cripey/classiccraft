@@ -1078,8 +1078,8 @@ reference until classiccraft catches up.
    (Human warrior male, look 0; the server makes it neutral) and the fresh roster takes the fast path. Mod
    `McwowAutoWorld`: with "world" set, exactly that world opens (folder = name), made on the Void preset the first
    time. Dev: `tools/minecraft.sh <Character>` (writes fabric/run/config/mcwow.json "world"; no name = last world) and
-   `tools/play.sh [--new] <Character>`. First-use link for the user's own data: fabric/run/saves/k2 -> Steve (to do
-   while Minecraft is closed). Co-op saves (friend's server + Minecraft server address) later.
+   `tools/play.sh [--new] <Character>`. First-use link for the user's own data: fabric/run/saves/k2 renamed to Steve
+   (done 2026-10-05). Co-op saves (friend's server + Minecraft server address) later.
 
 ## Session 2026-10-04 (second half) - state at wrap-up
 - Pushed 2026-10-04 (user's go, after a personal-data scrub): classiccraft f4bb84b, benilla db54490d, VMaNGOS 7c71a08af.
